@@ -3050,8 +3050,8 @@
         }
 
         // ===== Mobile sidebar drawer =====
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn') || document.createElement('button'); // null-safe
+                const sidebarBackdrop = document.getElementById('sidebarBackdrop');
         const sidebar = document.querySelector('.fp-sidebar');
 
         function toggleSidebar() {
