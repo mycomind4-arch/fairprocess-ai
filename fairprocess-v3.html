@@ -3499,9 +3499,8 @@
         }
 
         // Navigation to projects page
-        document.querySelector('.fp-nav-item[data-page="projects"]').addEventListener('click', () => {
-            loadProjects();
-        });
+        const projectsNavBtn = document.querySelector('.fp-nav-item[data-page="projects"]');
+        if (projectsNavBtn) projectsNavBtn.addEventListener('click', () => { loadProjects(); });
 
         // ===== Records Sync =====
         const RECORDS_AGENT_ICONS = {
@@ -3519,9 +3518,25 @@
 
         async function loadRecordsAgents() {
             try {
-                recordsAgents = await apiCall('/records/agents', 'GET');
-                renderRecordsAgents([], 'idle');
-            } catch (e) { console.error('loadRecordsAgents error:', e); }
+                const res = await fetch(API + '/records/agents');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                recordsAgents = await res.json();
+                if (recordsAgents && recordsAgents.length > 0) {
+                    renderRecordsAgents([], 'idle');
+                } else {
+                    document.getElementById('recordsAgentsGrid').innerHTML = '<div style="text-align:center;grid-column:1/-1;padding:24px;color:var(--text-tertiary);"><p style="font-size:13px;">No agents available. Check Worker deployment.</p></div>';
+                }
+            } catch (e) {
+                console.error('loadRecordsAgents error:', e);
+                // Retry after 2 seconds
+                setTimeout(async () => {
+                    try {
+                        const res = await fetch(API + '/records/agents');
+                        recordsAgents = await res.json();
+                        if (recordsAgents && recordsAgents.length > 0) renderRecordsAgents([], 'idle');
+                    } catch (e2) { console.error('loadRecordsAgents retry error:', e2); }
+                }, 2000);
+            }
         }
 
         function renderRecordsAgents(agentStatuses, state) {
@@ -3642,8 +3657,10 @@
                     container.innerHTML = '<p style="font-size:12px;color:var(--text-tertiary);padding:8px 0;">No syncs yet.</p>';
                     return;
                 }
-                container.innerHTML = searches.slice(0, 10).map(s => `
-                    <div class="fp-records-history-item" onclick="loadSyncResults('${s.id}'); document.getElementById('recordsAddressInput').value='${s.address || s.apn || ''}';">
+                container.innerHTML = searches.slice(0, 10).map(s => {
+                    const safeAddr = (s.address || s.apn || '').replace(/'/g, "\'");
+                    return `
+                    <div class="fp-records-history-item" data-sync-id="${s.id}" data-sync-addr="${safeAddr}">
                         <div class="addr">${s.address || 'APN ' + s.apn}</div>
                         <div class="meta">
                             <span>${s.county}</span>
@@ -3651,8 +3668,17 @@
                             <span>${s.status}</span>
                             <span>${new Date(s.created_date).toLocaleDateString()}</span>
                         </div>
-                    </div>
-                `).join('');
+                    </div>`;
+                }).join('');
+                // Attach click handlers after render
+                container.querySelectorAll('.fp-records-history-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const sid = item.dataset.syncId;
+                        const addr = item.dataset.syncAddr;
+                        if (addr) document.getElementById('recordsAddressInput').value = addr;
+                        if (sid) loadSyncResults(sid);
+                    });
+                });
             } catch (e) { console.error('loadRecordsHistory error:', e); }
         }
 
@@ -3662,10 +3688,11 @@
         });
 
         // ===== Init: Load real data on page load =====
-        loadCaseContext();
-        loadProjects();
-        loadRecordsAgents();
-        loadRecordsHistory(); // Load projects for sidebar badge
+        window.addEventListener('error', (e) => console.error('Global JS error:', e.message, e.filename, e.lineno));
+        try { loadCaseContext(); } catch(e) { console.error('Init loadCaseContext:', e); }
+        try { loadProjects(); } catch(e) { console.error('Init loadProjects:', e); }
+        try { loadRecordsAgents(); } catch(e) { console.error('Init loadRecordsAgents:', e); }
+        try { loadRecordsHistory(); } catch(e) { console.error('Init loadRecordsHistory:', e); }
         setTimeout(drawGraphEdges, 100);
         window.addEventListener('resize', () => setTimeout(drawGraphEdges, 100));
     </script>
