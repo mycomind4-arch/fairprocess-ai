@@ -1,5 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.31";
 
+// ===== Neutrality Guardrail =====
 const GUARDRAIL = "You identify evidentiary status. You do not render legal conclusions.";
 
 const GUARDRAIL_REWRITES = {
@@ -34,49 +35,311 @@ async function sha256(text) {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function businessDaysBetween(startDate, endDate) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  let count = 0;
-  const current = new Date(start);
-  while (current < end) {
-    current.setDate(current.getDate() + 1);
-    const day = current.getDay();
-    if (day !== 0 && day !== 6) count++;
+// ===== Cloudflare Workers AI =====
+const CF_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+
+async function callCloudflareAI(systemPrompt, userPrompt, maxTokens = 1024) {
+  const apiToken = Deno.env.get("CLOUDFLARE_API_TOKEN");
+  const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
+
+  if (!apiToken || !accountId) {
+    throw new Error("Cloudflare credentials not configured");
   }
-  return count;
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${CF_MODEL}`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.3
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cloudflare AI error ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.result?.choices?.[0]?.message?.content || data.result?.response || "";
+
+  // Try to extract JSON from the response
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      // Return raw content if JSON parsing fails
+      return { raw_response: content };
+    }
+  }
+  return { raw_response: content };
 }
 
-function calendarDaysBetween(startDate, endDate) {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  return Math.round((end - start) / (1000 * 60 * 60 * 24));
-}
+// ===== Agent System Prompts =====
 
-// deadline_direction: "max" = must be within X days, "min" = must be at least X days
-const STATUTES = {
-  "HCC § 351-7": {
-    description: "Citation shall be mailed within 3 business days of execution. Mailing date = postmark date.",
-    deadline_type: "business_days", deadline_value: 3, deadline_direction: "max",
-    start_event: "citation_execution", end_event: "mailing_postmark"
-  },
-  "HCC § 351-12": {
-    description: "Notice published at least 10 days before hearing date.",
-    deadline_type: "calendar_days", deadline_value: 10, deadline_direction: "min",
-    start_event: "first_publication", end_event: "hearing_date"
-  },
-  "CA Gov Code § 65852.2": {
-    description: "Approve or disapprove ADU application within 60 days of complete application.",
-    deadline_type: "calendar_days", deadline_value: 60, deadline_direction: "max",
-    start_event: "complete_application", end_event: "decision_rendered"
-  },
-  "HCC § 4.2": {
-    description: "Notice posted and mailed within 5 business days of enforcement action.",
-    deadline_type: "business_days", deadline_value: 5, deadline_direction: "max",
-    start_event: "enforcement_action", end_event: "notice_mailed"
-  }
+const SYSTEM_PROMPTS = {
+  statute_matching: `You are a Statute Matching Agent for a jurisdiction intelligence system.
+${GUARDRAIL}
+Given a set of verified facts with dates and a list of statutes with deadline rules, analyze whether the elapsed time between consecutive events matches the required deadline.
+
+For each statute, determine:
+- Whether the elapsed time is within (max) or at least (min) the required deadline
+- Status: "matches expected window" or "deviation detected"
+- A factual note describing the calculation
+
+NEVER use words: "compliant", "non-compliant", "violation", "unlawful", "invalid", "void", "guilty", "liable".
+Instead use: "matches expected window", "deviation detected", "conflict identified", "evidence suggests".
+
+Return ONLY valid JSON in this format:
+{
+  "results": [
+    {
+      "statute_ref": "statute reference",
+      "required_rule": "the rule description",
+      "actual_event": { "start_date": "date", "end_date": "date", "elapsed_days": number, "deadline_direction": "max or min" },
+      "status": "matches expected window" or "deviation detected",
+      "note": "factual note about the calculation"
+    }
+  ]
+}`,
+
+  timeline: `You are a Timeline Agent for a jurisdiction intelligence system.
+${GUARDRAIL}
+Given a set of verified facts with dates, sequence them chronologically and identify time gaps between consecutive events.
+
+Flag any gap longer than 7 days as potentially significant.
+
+NEVER use legal conclusion words. Use "verified" for confirmed events, "conflict" for disputed ones.
+
+Return ONLY valid JSON:
+{
+  "events": [
+    { "date": "date", "event": "description", "status": "verified" or "conflict", "source_doc": "source" }
+  ],
+  "gaps": [
+    { "from": "date", "to": "date", "days": number, "from_event": "desc", "to_event": "desc", "flagged": boolean }
+  ]
+}`,
+
+  discrepancy: `You are a Discrepancy Agent for a jurisdiction intelligence system.
+${GUARDRAIL}
+Given a set of verified facts from different source documents, identify conflicts:
+1. Same-date facts with different claims (fact_mismatch)
+2. Mailing/postmark/sending/delivery facts with different dates (date_mismatch)
+
+For each conflict, describe what each source claims but DO NOT resolve which is accurate.
+
+NEVER use legal conclusion words. Characterize the conflict neutrally.
+
+Return ONLY valid JSON:
+{
+  "conflicts": [
+    {
+      "conflict_type": "fact_mismatch" or "date_mismatch",
+      "source_a": { "doc": "source", "text": "claim", "date": "date if applicable" },
+      "source_b": { "doc": "source", "text": "claim", "date": "date if applicable" },
+      "characterization": "neutral description of the conflict",
+      "status": "open"
+    }
+  ]
+}`,
+
+  fact_extraction: `You are a Fact Extraction Agent for a jurisdiction intelligence system.
+${GUARDRAIL}
+Given document text, extract factual statements that contain dates. For each fact:
+- Assign a fact_id
+- Record the source document
+- Extract the date mentioned
+- Assign a confidence score (0.0-1.0)
+
+Only extract factual statements, not opinions or legal conclusions.
+
+Return ONLY valid JSON:
+{
+  "facts": [
+    {
+      "fact_id": "f_001",
+      "text": "the factual statement",
+      "source_doc": "document name",
+      "date": "date in YYYY-MM-DD format if determinable",
+      "confidence": 0.95
+    }
+  ]
+}`
 };
 
+// ===== Build user prompts from case context =====
+
+function buildStatutePrompt(caseContext) {
+  const facts = caseContext?.verified_facts || [];
+  const statutes = [
+    { ref: "HCC § 351-7", description: "Citation shall be mailed within 3 business days of execution. Mailing date = postmark date.", deadline_type: "business_days", deadline_value: 3, deadline_direction: "max" },
+    { ref: "HCC § 351-12", description: "Notice published at least 10 days before hearing date.", deadline_type: "calendar_days", deadline_value: 10, deadline_direction: "min" },
+    { ref: "CA Gov Code § 65852.2", description: "Approve or disapprove ADU application within 60 days of complete application.", deadline_type: "calendar_days", deadline_value: 60, deadline_direction: "max" },
+    { ref: "HCC § 4.2", description: "Notice posted and mailed within 5 business days of enforcement action.", deadline_type: "business_days", deadline_value: 5, deadline_direction: "max" }
+  ];
+
+  return `Verified facts for case ${caseContext?.case_id}:
+${JSON.stringify(facts, null, 2)}
+
+Statutes to check against:
+${JSON.stringify(statutes, null, 2)}
+
+Analyze each consecutive pair of facts against each statute. Calculate elapsed days (business days exclude weekends). Determine if the elapsed time matches the required deadline.`;
+}
+
+function buildTimelinePrompt(caseContext) {
+  const facts = caseContext?.verified_facts || [];
+  return `Verified facts for case ${caseContext?.case_id}:
+${JSON.stringify(facts, null, 2)}
+
+Sequence these facts chronologically by date. Identify gaps between consecutive events. Flag gaps over 7 days.`;
+}
+
+function buildDiscrepancyPrompt(caseContext) {
+  const facts = caseContext?.verified_facts || [];
+  return `Verified facts for case ${caseContext?.case_id}:
+${JSON.stringify(facts, null, 2)}
+
+Identify conflicts between these facts:
+1. Same-date facts with different claims
+2. Facts about mailing/postmark/sending/delivery with different dates
+Do NOT resolve which source is accurate. Just characterize the conflict.`;
+}
+
+function buildFactExtractionPrompt(documentText, documentName) {
+  return `Document name: ${documentName || "unknown"}
+Document text:
+${documentText}
+
+Extract all factual statements that contain dates. Convert dates to YYYY-MM-DD format. Assign confidence scores.`;
+}
+
+// ===== LLM-powered agent executors =====
+
+async function execStatuteMatching(input, caseContext) {
+  try {
+    const result = await callCloudflareAI(
+      SYSTEM_PROMPTS.statute_matching,
+      buildStatutePrompt(caseContext),
+      1024
+    );
+    // Apply guardrail to each result note
+    if (result.results) {
+      for (const r of result.results) {
+        if (r.note) {
+          const guarded = applyGuardrail(r.note);
+          r.note = guarded.text;
+          r.guardrail_blocks = guarded.blocks;
+        }
+      }
+    }
+    return {
+      agent_name: "Statute Matching Agent", agent_key: "statute_matching",
+      status: "success", output: result,
+      guardrail_blocks: result.results?.flatMap(r => r.guardrail_blocks || []) || []
+    };
+  } catch (e) {
+    return {
+      agent_name: "Statute Matching Agent", agent_key: "statute_matching",
+      status: "error", output: { error: e.message },
+      guardrail_blocks: []
+    };
+  }
+}
+
+async function execTimeline(input, caseContext) {
+  try {
+    const result = await callCloudflareAI(
+      SYSTEM_PROMPTS.timeline,
+      buildTimelinePrompt(caseContext),
+      1024
+    );
+    return {
+      agent_name: "Timeline Agent", agent_key: "timeline",
+      status: "success", output: result,
+      guardrail_blocks: []
+    };
+  } catch (e) {
+    return {
+      agent_name: "Timeline Agent", agent_key: "timeline",
+      status: "error", output: { error: e.message },
+      guardrail_blocks: []
+    };
+  }
+}
+
+async function execDiscrepancy(input, caseContext) {
+  try {
+    const result = await callCloudflareAI(
+      SYSTEM_PROMPTS.discrepancy,
+      buildDiscrepancyPrompt(caseContext),
+      1024
+    );
+    return {
+      agent_name: "Discrepancy Agent", agent_key: "discrepancy",
+      status: result.conflicts?.length > 0 ? "success" : "partial",
+      output: result,
+      guardrail_blocks: []
+    };
+  } catch (e) {
+    return {
+      agent_name: "Discrepancy Agent", agent_key: "discrepancy",
+      status: "error", output: { error: e.message },
+      guardrail_blocks: []
+    };
+  }
+}
+
+async function execFactExtraction(input, caseContext) {
+  const text = input.document_text || "";
+  if (!text) {
+    return {
+      agent_name: "Fact Extraction Agent", agent_key: "fact_extraction",
+      status: "partial", output: { facts: [], note: "No document text provided" },
+      guardrail_blocks: []
+    };
+  }
+  try {
+    const result = await callCloudflareAI(
+      SYSTEM_PROMPTS.fact_extraction,
+      buildFactExtractionPrompt(text, input.document_name),
+      1024
+    );
+    return {
+      agent_name: "Fact Extraction Agent", agent_key: "fact_extraction",
+      status: result.facts?.length > 0 ? "success" : "partial",
+      output: result,
+      guardrail_blocks: []
+    };
+  } catch (e) {
+    return {
+      agent_name: "Fact Extraction Agent", agent_key: "fact_extraction",
+      status: "error", output: { error: e.message },
+      guardrail_blocks: []
+    };
+  }
+}
+
+const EXECUTORS = {
+  statute_matching: execStatuteMatching,
+  timeline: execTimeline,
+  discrepancy: execDiscrepancy,
+  fact_extraction: execFactExtraction
+};
+
+// ===== Tier 1 routing =====
 function tier1Route(pageContext, message) {
   const msg = (message || "").toLowerCase();
   if (pageContext === "evidence_viewer" && (msg.includes("upload") || msg.includes("document"))) {
@@ -107,160 +370,7 @@ function tier2Route() {
   return { agents: ["statute_matching", "timeline"], sequential: false };
 }
 
-function execStatuteMatching(input, caseContext) {
-  const facts = caseContext?.verified_facts || [];
-  const results = [];
-  for (let i = 0; i < facts.length - 1; i++) {
-    for (const [ref, statute] of Object.entries(STATUTES)) {
-      const start = facts[i].date;
-      const end = facts[i + 1].date;
-      if (!start || !end) continue;
-      const days = statute.deadline_type === "business_days"
-        ? businessDaysBetween(start, end)
-        : calendarDaysBetween(start, end);
-      
-      let status;
-      if (statute.deadline_direction === "max") {
-        // Must be WITHIN X days (days <= value = good)
-        status = days <= statute.deadline_value ? "matches expected window" : "deviation detected";
-      } else {
-        // Must be AT LEAST X days (days >= value = good)
-        status = days >= statute.deadline_value ? "matches expected window" : "deviation detected";
-      }
-      
-      let note = `${days} ${statute.deadline_type.replace(/_/g, " ")} between ${start} and ${end}. Required: ${statute.deadline_direction === "max" ? "within" : "at least"} ${statute.deadline_value} ${statute.deadline_type.replace(/_/g, " ")}.`;
-      const guarded = applyGuardrail(note);
-      if (guarded.blocks.length > 0) note = guarded.text;
-      results.push({
-        statute_ref: ref, required_rule: statute.description,
-        actual_event: { start_date: start, end_date: end, elapsed_days: days, deadline_direction: statute.deadline_direction },
-        status, note, guardrail_blocks: guarded.blocks
-      });
-    }
-  }
-  return {
-    agent_name: "Statute Matching Agent", agent_key: "statute_matching",
-    status: "success", output: { results, statutes_checked: Object.keys(STATUTES).length },
-    guardrail_blocks: results.flatMap(r => r.guardrail_blocks || [])
-  };
-}
-
-function execTimeline(input, caseContext) {
-  const facts = caseContext?.verified_facts || [];
-  const sorted = facts.filter(f => f.date).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const events = sorted.map(f => ({
-    date: f.date, event: f.text, status: "verified", source_doc: f.source_doc
-  }));
-  const gaps = [];
-  for (let i = 0; i < events.length - 1; i++) {
-    const days = calendarDaysBetween(events[i].date, events[i + 1].date);
-    gaps.push({
-      from: events[i].date, to: events[i + 1].date, days,
-      from_event: events[i].event, to_event: events[i + 1].event,
-      flagged: days > 7
-    });
-  }
-  return {
-    agent_name: "Timeline Agent", agent_key: "timeline",
-    status: "success", output: { events, gaps, gaps_flagged: gaps.filter(g => g.flagged).length },
-    guardrail_blocks: []
-  };
-}
-
-function execDiscrepancy(input, caseContext) {
-  const facts = caseContext?.verified_facts || [];
-  const conflicts = [];
-  
-  // Check for same-date conflicting claims
-  for (let i = 0; i < facts.length; i++) {
-    for (let j = i + 1; j < facts.length; j++) {
-      if (facts[i].date === facts[j].date && facts[i].text !== facts[j].text) {
-        conflicts.push({
-          conflict_type: "fact_mismatch", date: facts[i].date,
-          source_a: { doc: facts[i].source_doc, text: facts[i].text },
-          source_b: { doc: facts[j].source_doc, text: facts[j].text },
-          characterization: `Conflict on ${facts[i].date}: "${facts[i].text}" (${facts[i].source_doc}) vs "${facts[j].text}" (${facts[j].source_doc}). Agent characterizes this conflict but does not resolve which is accurate.`,
-          status: "open"
-        });
-      }
-    }
-  }
-  
-  // Check for mailing/postmark date conflicts (same event, different dates)
-  const mailingKeywords = ["mail", "postmark", "sent", "deliver"];
-  const mailingFacts = facts.filter(f => 
-    mailingKeywords.some(kw => f.text.toLowerCase().includes(kw))
-  );
-  
-  if (mailingFacts.length >= 2) {
-    for (let i = 0; i < mailingFacts.length; i++) {
-      for (let j = i + 1; j < mailingFacts.length; j++) {
-        if (mailingFacts[i].date !== mailingFacts[j].date) {
-          const exists = conflicts.some(c =>
-            (c.source_a?.text === mailingFacts[i].text && c.source_b?.text === mailingFacts[j].text) ||
-            (c.source_a?.text === mailingFacts[j].text && c.source_b?.text === mailingFacts[i].text)
-          );
-          if (!exists) {
-            conflicts.push({
-              conflict_type: "date_mismatch",
-              source_a: { doc: mailingFacts[i].source_doc, text: mailingFacts[i].text, date: mailingFacts[i].date },
-              source_b: { doc: mailingFacts[j].source_doc, text: mailingFacts[j].text, date: mailingFacts[j].date },
-              characterization: `Mailing/postmark date conflict: "${mailingFacts[i].text}" (${mailingFacts[i].source_doc}, ${mailingFacts[i].date}) vs "${mailingFacts[j].text}" (${mailingFacts[j].source_doc}, ${mailingFacts[j].date}). Agent characterizes this conflict but does not resolve which date is accurate.`,
-              status: "open"
-            });
-          }
-        }
-      }
-    }
-  }
-  
-  return {
-    agent_name: "Discrepancy Agent", agent_key: "discrepancy",
-    status: conflicts.length > 0 ? "success" : "partial",
-    output: { conflicts, conflicts_found: conflicts.length },
-    guardrail_blocks: []
-  };
-}
-
-function execFactExtraction(input, caseContext) {
-  const text = input.document_text || "";
-  if (!text) {
-    return {
-      agent_name: "Fact Extraction Agent", agent_key: "fact_extraction",
-      status: "partial", output: { facts: [], note: "No document text provided" },
-      guardrail_blocks: []
-    };
-  }
-  const datePattern = /(\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b)/gi;
-  const facts = [];
-  const sentences = text.split(/[.]\s+/);
-  for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i].trim();
-    if (sentence.length < 10) continue;
-    const sentenceDates = sentence.match(datePattern);
-    if (sentenceDates) {
-      facts.push({
-        fact_id: `f_${String(i + 1).padStart(3, "0")}`,
-        text: sentence, source_doc: input.document_name || "unknown",
-        date: sentenceDates[0], confidence: 0.85 + Math.random() * 0.14
-      });
-    }
-  }
-  return {
-    agent_name: "Fact Extraction Agent", agent_key: "fact_extraction",
-    status: facts.length > 0 ? "success" : "partial",
-    output: { facts, facts_extracted: facts.length },
-    guardrail_blocks: []
-  };
-}
-
-const EXECUTORS = {
-  statute_matching: execStatuteMatching,
-  timeline: execTimeline,
-  discrepancy: execDiscrepancy,
-  fact_extraction: execFactExtraction
-};
-
+// ===== Main gateway =====
 Deno.serve(async (req) => {
   try {
     const body = await req.json();
@@ -275,6 +385,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const startedAt = new Date().toISOString();
 
+    // Load CaseContext
     let caseContext = null;
     try {
       const contexts = await base44.entities.CaseContext.filter({ case_id });
@@ -288,9 +399,11 @@ Deno.serve(async (req) => {
       caseContext = { case_id, verified_facts: [], open_discrepancies: [], active_statutes: [] };
     }
 
+    // Route
     let routing = tier1Route(page_context, message);
     if (!routing) routing = tier2Route();
 
+    // Log invocation
     try {
       await base44.entities.AgentInvocation.create({
         case_id, page_context: page_context || "unknown", message: message || "",
@@ -298,6 +411,7 @@ Deno.serve(async (req) => {
       });
     } catch (e) { /* non-blocking */ }
 
+    // Execute agents (all async now — LLM calls)
     const input = { message, document_text, document_name, caseContext };
     const agentResults = [];
 
@@ -306,18 +420,19 @@ Deno.serve(async (req) => {
       for (const agentKey of routing.agents) {
         const executor = EXECUTORS[agentKey];
         if (!executor) continue;
-        const result = executor(input, acc);
+        const result = await executor(input, acc);
         if (result.output?.facts) {
           acc.verified_facts = [...(acc.verified_facts || []), ...result.output.facts];
         }
         agentResults.push(result);
       }
     } else {
-      for (const agentKey of routing.agents) {
-        const executor = EXECUTORS[agentKey];
-        if (!executor) continue;
-        agentResults.push(executor(input, caseContext));
-      }
+      // Run agents in parallel
+      const promises = routing.agents
+        .filter(k => EXECUTORS[k])
+        .map(k => EXECUTORS[k](input, caseContext));
+      const results = await Promise.all(promises);
+      agentResults.push(...results);
     }
 
     const completedAt = new Date().toISOString();
@@ -338,26 +453,34 @@ Deno.serve(async (req) => {
     const tl = agentResults.find(r => r.agent_key === "timeline");
     const da = agentResults.find(r => r.agent_key === "discrepancy");
 
+    // Build response text from LLM outputs
     if (da && da.output?.conflicts?.length > 0) {
-      responseText = `${da.output.conflicts.length} discrepancy(ies) found. ${da.output.conflicts[0].characterization}`;
+      responseText = `${da.output.conflicts.length} discrepancy(ies) found. ${da.output.conflicts[0].characterization || da.output.conflicts[0].source_a?.text + " vs " + da.output.conflicts[0].source_b?.text}`;
       if (sm && sm.output?.results?.length > 0) {
         const deviations = sm.output.results.filter(r => r.status === "deviation detected");
-        if (deviations.length > 0) {
-          responseText += ` Additionally, ${deviations.length} statute deviation(s) detected.`;
-        }
+        if (deviations.length > 0) responseText += ` Additionally, ${deviations.length} statute deviation(s) detected.`;
       }
     } else if (sm && sm.output?.results?.length > 0) {
       const deviations = sm.output.results.filter(r => r.status === "deviation detected");
+      const matches = sm.output.results.filter(r => r.status === "matches expected window");
       const r = sm.output.results[0];
       responseText = `Analysis for case ${case_id}: Under ${r.statute_ref}, the required rule is "${r.required_rule}". Actual elapsed: ${r.actual_event?.elapsed_days || "unknown"} days. Status: ${r.status}.`;
       if (r.note) responseText += ` ${r.note}`;
-      if (deviations.length > 1) responseText += ` ${deviations.length} total deviation(s) detected across all statute checks.`;
+      if (deviations.length > 0) responseText += ` ${deviations.length} deviation(s) detected.`;
+      if (matches.length > 0) responseText += ` ${matches.length} statute check(s) match expected window.`;
     } else if (tl && tl.output?.events?.length > 0) {
-      responseText = `Timeline analysis for ${case_id}: ${tl.output.events.length} events sequenced, ${tl.output.gaps_flagged || 0} gap(s) flagged.`;
+      const flagged = tl.output.gaps?.filter(g => g.flagged)?.length || 0;
+      responseText = `Timeline analysis for ${case_id}: ${tl.output.events.length} events sequenced, ${tl.output.gaps?.length || 0} gap(s) found, ${flagged} flagged.`;
     } else {
-      responseText = `Analysis complete for ${case_id}. ${routing.agents.length} agent(s) executed. Case has ${caseContext.verified_facts?.length || 0} verified facts.`;
+      const errors = agentResults.filter(r => r.status === "error");
+      if (errors.length > 0) {
+        responseText = `Analysis for ${case_id} encountered errors: ${errors.map(e => e.agent_name + ": " + e.output?.error).join("; ")}`;
+      } else {
+        responseText = `Analysis complete for ${case_id}. ${routing.agents.length} agent(s) executed.`;
+      }
     }
 
+    // Update CaseContext
     try {
       const updateData = {
         case_id, last_updated_by_agent: routing.agents.join(", "), updated_at: completedAt
@@ -376,11 +499,13 @@ Deno.serve(async (req) => {
       }
     } catch (e) { /* non-blocking */ }
 
+    // Write AgentRun records with SHA-256 hashes
     const ledgerEntries = [];
     for (const result of agentResults) {
       const ledgerText = JSON.stringify({
         case_id, agent_name: result.agent_name,
-        started_at: startedAt, completed_at: completedAt, output: result.output
+        started_at: startedAt, completed_at: completedAt,
+        output: result.output, model: CF_MODEL
       });
       let hash = "unavailable";
       try { hash = await sha256(ledgerText); } catch (e) {}
@@ -392,7 +517,7 @@ Deno.serve(async (req) => {
         });
         ledgerEntries.push({
           agent: result.agent_name, hash: hash.substring(0, 12),
-          guardrail_blocks: result.guardrail_blocks || []
+          status: result.status, guardrail_blocks: result.guardrail_blocks || []
         });
       } catch (e) { /* non-blocking */ }
     }
@@ -405,6 +530,7 @@ Deno.serve(async (req) => {
       statute_results: sm?.output?.results || [],
       timeline_events: tl?.output?.events || [],
       timeline_gaps: tl?.output?.gaps || [],
+      llm_model: CF_MODEL,
       ledger_entries: ledgerEntries,
       guardrail_blocks: agentResults.flatMap(r => r.guardrail_blocks || []),
       guardrail: GUARDRAIL
