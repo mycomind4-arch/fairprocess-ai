@@ -467,16 +467,163 @@
         /* ================================================================
            Mobile
            ================================================================ */
+        /* ================================================================
+           Mobile Responsive (≤768px)
+           ================================================================ */
+        .fp-mobile-menu-btn { display: none; }
+        .fp-sidebar-backdrop { display: none; }
+
         @media (max-width: 768px) {
-            .fp-sidebar { display: none; }
-            .fp-agent-frame { width: 100%; }
-            .fp-ps-layout { grid-template-columns: 1fr; }
-            .fp-grid-2, .fp-grid-3, .fp-grid-4 { grid-template-columns: 1fr; }
+            /* ===== Layout ===== */
+            .fp-content { padding: 16px; }
+            .fp-page-title { font-size: 20px; }
+            .fp-page-subtitle { font-size: 13px; margin-bottom: 16px; }
+            .fp-panel { padding: 16px; }
+            .fp-panel-header { flex-wrap: wrap; gap: 8px; }
+            .fp-panel-title { font-size: 14px; }
+
+            /* ===== Sidebar → Drawer ===== */
+            .fp-mobile-menu-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px; height: 36px;
+                border-radius: 8px; border: none;
+                background: transparent; cursor: pointer;
+                color: var(--text-secondary);
+                flex-shrink: 0;
+            }
+            .fp-mobile-menu-btn:hover { background: var(--surface-muted); }
+            .fp-mobile-menu-btn svg { width: 20px; height: 20px; }
+            .fp-sidebar {
+                position: fixed;
+                left: 0; top: 0; bottom: 0;
+                width: 280px;
+                transform: translateX(-100%);
+                z-index: 200;
+                transition: transform 0.3s ease;
+            }
+            .fp-sidebar.open { transform: translateX(0); }
+            .fp-sidebar-backdrop {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.4);
+                z-index: 150;
+            }
+            .fp-sidebar-backdrop.active { display: block; }
+
+            /* ===== Header ===== */
+            .fp-header { padding: 0 12px; gap: 8px; height: 56px; }
+            .fp-search { max-width: none; }
+            .fp-search input { padding: 8px 10px 8px 32px; font-size: 13px; }
+            .fp-header-user-name, .fp-header-user-role { display: none; }
+            .fp-header-user { padding: 4px; }
+            .fp-agent-toggle { padding: 6px 10px; font-size: 11px; }
+            .fp-agent-toggle .dot { width: 7px; height: 7px; }
+            .fp-header-btn { width: 32px; height: 32px; }
+
+            /* ===== Context Bar → Scrollable ===== */
+            .fp-ctx-bar {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                padding: 10px 12px;
+                gap: 8px;
+            }
+            .fp-ctx-bar::-webkit-scrollbar { display: none; }
+            .fp-ctx-chip {
+                white-space: nowrap;
+                flex-shrink: 0;
+                font-size: 12px;
+                padding: 4px 10px;
+            }
+            .fp-ctx-chip .count { font-size: 13px; }
+            .fp-ctx-sync { display: none; }
+
+            /* ===== Grids ===== */
+            .fp-grid-2, .fp-grid-3, .fp-grid-4 {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .fp-grid-4 { grid-template-columns: repeat(2, 1fr); }
+            .fp-stat { padding: 14px; }
+            .fp-stat-value { font-size: 22px; }
+            .fp-stat-label { font-size: 11px; }
+
+            /* ===== Agent Frame → Full Screen ===== */
+            .fp-agent-frame {
+                width: 100%;
+                top: 0;
+                border-left: none;
+            }
+            .fp-agent-header { padding: 12px; }
+
+            /* ===== Chat ===== */
+            .fp-chat-area { padding: 12px; }
+            .fp-chat-bubble { font-size: 14px; padding: 12px 14px; }
+            .fp-chat-input { padding: 10px 12px; }
+            .fp-chat-input input { font-size: 15px; padding: 10px 12px; }
+            .fp-chat-avatar { width: 32px; height: 32px; font-size: 11px; }
+
+            /* ===== Tables → Scrollable ===== */
+            table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+
+            /* ===== Graph → Smaller ===== */
+            .fp-graph-container { min-height: 400px; overflow-x: auto; }
+
+            /* ===== Tags & Buttons ===== */
+            .fp-tag { font-size: 10px; padding: 2px 8px; }
+            .fp-btn { padding: 10px 16px; font-size: 13px; }
+            .fp-btn.sm { padding: 7px 12px; }
+
+            /* ===== Deadline Track ===== */
+            .fp-deadline-line { margin: 0 12px; }
+            .fp-deadline-label { font-size: 9px; }
+
+            /* ===== Ledger ===== */
+            .fp-ledger-entry { padding: 10px 0; gap: 8px; }
+            .fp-ledger-title { font-size: 12px; }
+            .fp-ledger-meta { font-size: 10px; }
+            .fp-ledger-hash { font-size: 10px; }
+
+            /* ===== Transcript ===== */
+            .fp-transcript-line { padding: 5px 0; gap: 6px; }
+            .fp-transcript-line .time { font-size: 9px; min-width: 44px; }
+            .fp-transcript-line .icon { width: 24px; height: 24px; font-size: 12px; }
+            .fp-transcript-line .text { font-size: 12px; }
+
+            /* ===== Evidence Chain ===== */
+            .fp-chain-step { padding-bottom: 16px; }
+
+            /* ===== Quick Actions hidden on mobile ===== */
+            .fp-quick { display: none; }
+
+            /* ===== Agent Insights ===== */
+            .fp-agent-insight .label { font-size: 11px; }
+            .fp-agent-insight .value { font-size: 12px; }
+        }
+
+        /* ================================================================
+           Small Mobile (≤420px)
+           ================================================================ */
+        @media (max-width: 420px) {
+            .fp-content { padding: 12px; }
+            .fp-panel { padding: 12px; border-radius: var(--radius-sm); }
+            .fp-grid-4 { grid-template-columns: 1fr; }
+            .fp-stat { padding: 12px; }
+            .fp-stat-value { font-size: 20px; }
+            .fp-page-title { font-size: 18px; }
+            .fp-chat-bubble { font-size: 13px; padding: 10px 12px; }
+            .fp-btn { padding: 8px 12px; font-size: 12px; }
+            .fp-header { padding: 0 10px; }
+            .fp-search input { font-size: 12px; }
         }
     </style>
 </head>
 <body>
     <div class="fp-app">
+        <div class="fp-sidebar-backdrop" id="sidebarBackdrop"></div>
         <!-- ===== Sidebar ===== -->
         <aside class="fp-sidebar">
             <div class="fp-logo">
@@ -2530,6 +2677,28 @@
                 }
             }
         }
+
+        // ===== Mobile sidebar drawer =====
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+        const sidebar = document.querySelector('.fp-sidebar');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            sidebarBackdrop.classList.toggle('active');
+        }
+        mobileMenuBtn.addEventListener('click', toggleSidebar);
+        sidebarBackdrop.addEventListener('click', toggleSidebar);
+
+        // Close sidebar on nav (mobile)
+        $$('.fp-nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('open');
+                    sidebarBackdrop.classList.remove('active');
+                }
+            });
+        });
 
         // ===== Init: Load real data on page load =====
         loadCaseContext();
