@@ -560,6 +560,70 @@
         .fp-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; }
 
         /* ================================================================
+           Records Sync Page
+           ================================================================ */
+        .fp-records-search { display: flex; gap: 12px; margin-bottom: 24px; }
+        .fp-records-search input { flex: 1; padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); font-size: 14px; color: var(--text-primary); outline: none; font-family: inherit; transition: border-color var(--transition); }
+        .fp-records-search input:focus { border-color: var(--accent); }
+        .fp-records-search select { padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); font-size: 13px; color: var(--text-primary); outline: none; font-family: inherit; cursor: pointer; }
+        .fp-records-search button { padding: 12px 24px; border-radius: var(--radius-sm); background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: white; border: none; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; display: flex; align-items: center; gap: 6px; white-space: nowrap; transition: all var(--transition); box-shadow: 0 2px 8px var(--accent-glow); }
+        .fp-records-search button:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+        .fp-records-search button:disabled { opacity: 0.6; cursor: wait; transform: none; }
+
+        .fp-records-agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .fp-records-agent { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; transition: all var(--transition); position: relative; overflow: hidden; }
+        .fp-records-agent.running { border-color: var(--accent); }
+        .fp-records-agent.completed { border-color: var(--success); }
+        .fp-records-agent.error { border-color: var(--danger); }
+        .fp-records-agent-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .fp-records-agent-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: var(--surface-strong); }
+        .fp-records-agent-name { font-size: 13px; font-weight: 600; flex: 1; }
+        .fp-records-agent-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; white-space: nowrap; }
+        .fp-records-agent-status.pending { background: var(--surface-strong); color: var(--text-tertiary); }
+        .fp-records-agent-status.running { background: var(--accent-light); color: var(--accent); }
+        .fp-records-agent-status.completed { background: rgba(34,197,94,0.1); color: var(--success); }
+        .fp-records-agent-status.error { background: rgba(239,68,68,0.1); color: var(--danger); }
+        .fp-records-agent-desc { font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px; line-height: 1.4; }
+        .fp-records-agent-meta { display: flex; gap: 12px; font-size: 11px; color: var(--text-quaternary); }
+        .fp-records-agent-meta .count { font-weight: 600; color: var(--text-secondary); }
+
+        .fp-records-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+        .fp-record-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; transition: all var(--transition); cursor: pointer; }
+        .fp-record-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+        .fp-record-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+        .fp-record-card-type { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .fp-record-card-type.assessment { background: rgba(99,102,241,0.1); color: #6366f1; }
+        .fp-record-card-type.code_violation { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .fp-record-card-type.zoning { background: rgba(34,197,94,0.1); color: var(--success); }
+        .fp-record-card-type.court_case { background: rgba(239,68,68,0.1); color: var(--danger); }
+        .fp-record-card-type.tax_status { background: rgba(168,85,247,0.1); color: #a855f7; }
+        .fp-record-card-type.permit { background: rgba(14,165,233,0.1); color: #0ea5e9; }
+        .fp-record-card-type.watch { background: rgba(234,179,8,0.1); color: #eab308; }
+        .fp-record-card-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; line-height: 1.3; }
+        .fp-record-card-source { font-size: 11px; color: var(--text-tertiary); margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
+        .fp-record-card-data { font-size: 12px; color: var(--text-secondary); line-height: 1.5; background: var(--surface-muted); border-radius: var(--radius-sm); padding: 10px 12px; }
+        .fp-record-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+        .fp-record-card-conf { font-size: 11px; display: flex; align-items: center; gap: 4px; }
+        .fp-record-card-conf-bar { width: 40px; height: 4px; border-radius: 2px; background: var(--surface-strong); overflow: hidden; }
+        .fp-record-card-conf-fill { height: 100%; border-radius: 2px; }
+        .fp-record-card-date { font-size: 11px; color: var(--text-tertiary); }
+
+        .fp-records-empty { text-align: center; padding: 48px; color: var(--text-tertiary); }
+        .fp-records-empty .icon { font-size: 40px; margin-bottom: 12px; }
+        .fp-records-empty .title { font-size: 16px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+        .fp-records-empty .desc { font-size: 13px; line-height: 1.5; max-width: 400px; margin: 0 auto; }
+
+        .fp-records-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--accent-light); border-top-color: var(--accent); border-radius: 50%; animation: fp-spin 0.8s linear infinite; }
+        @keyframes fp-spin { to { transform: rotate(360deg); } }
+
+        .fp-records-history { margin-top: 24px; }
+        .fp-records-history-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary); }
+        .fp-records-history-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 6px; cursor: pointer; transition: all var(--transition); }
+        .fp-records-history-item:hover { border-color: var(--accent); background: var(--surface-muted); }
+        .fp-records-history-item .addr { font-size: 13px; font-weight: 500; flex: 1; }
+        .fp-records-history-item .meta { font-size: 11px; color: var(--text-tertiary); display: flex; gap: 12px; }
+
+        /* ================================================================
            Mobile Responsive (≤768px)
            ================================================================ */
         .fp-mobile-menu-btn { display: none; }
@@ -761,6 +825,10 @@
                 </button>
 
                 <div class="fp-nav-label">Cases & Evidence</div>
+                <button class="fp-nav-item" data-page="records-sync">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                    Records Sync
+                </button>
                 <button class="fp-nav-item" data-page="cases">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
                     Cases
@@ -895,6 +963,44 @@
                 <!-- ============================================================
                 PAGE: ASSISTANT (V2 shell)
                 ============================================================ -->
+                <!-- ===== Records Sync Page ===== -->
+                <div class="fp-page" id="page-records-sync">
+                    <h1 class="fp-page-title">Public Records Sync</h1>
+                    <p class="fp-page-subtitle">Enter a property address or APN. Specialist agents fan out to scrape county assessor, permits, code enforcement, court records, zoning, and tax status.</p>
+
+                    <div class="fp-records-search">
+                        <input type="text" id="recordsAddressInput" placeholder="Enter address (e.g. 732 Evergreen Terrace, Eureka, CA 95501) or APN..." />
+                        <select id="recordsCountySelect">
+                            <option value="Humboldt">Humboldt County</option>
+                            <option value="Los Angeles">Los Angeles County</option>
+                            <option value="San Francisco">San Francisco County</option>
+                            <option value="Sacramento">Sacramento County</option>
+                            <option value="Sonoma">Sonoma County</option>
+                            <option value="Mendocino">Mendocino County</option>
+                        </select>
+                        <button id="recordsSyncBtn">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                            Sync Records
+                        </button>
+                    </div>
+
+                    <div class="fp-records-agents" id="recordsAgentsGrid">
+                        <div style="text-align:center;grid-column:1/-1;padding:24px;color:var(--text-tertiary);">
+                            <p style="font-size:13px;">Enter a property above and click "Sync Records" to deploy the agent network.</p>
+                        </div>
+                    </div>
+
+                    <div id="recordsResultsSection" style="display:none;">
+                        <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text-secondary);">Found Records</h3>
+                        <div class="fp-records-results" id="recordsResults"></div>
+                    </div>
+
+                    <div class="fp-records-history" id="recordsHistory">
+                        <div class="fp-records-history-title">Recent Syncs</div>
+                        <div id="recordsHistoryList"></div>
+                    </div>
+                </div>
+
                 <!-- ===== Projects Page ===== -->
                 <div class="fp-page" id="page-projects">
                     <div class="fp-projects-header">
@@ -3397,9 +3503,169 @@
             loadProjects();
         });
 
+        // ===== Records Sync =====
+        const RECORDS_AGENT_ICONS = {
+            "Property Assessor Agent": "🏠",
+            "Code Enforcement Agent": "⚠️",
+            "Planning & Zoning Agent": "📐",
+            "Court Records Agent": "⚖️",
+            "Tax Records Agent": "💰",
+            "Permit History Agent": "📄",
+            "Records Watch Agent": "👁️"
+        };
+
+        let recordsAgents = [];
+        let activeSyncId = null;
+
+        async function loadRecordsAgents() {
+            try {
+                recordsAgents = await apiCall('/records/agents', 'GET');
+                renderRecordsAgents([], 'idle');
+            } catch (e) { console.error('loadRecordsAgents error:', e); }
+        }
+
+        function renderRecordsAgents(agentStatuses, state) {
+            const grid = document.getElementById('recordsAgentsGrid');
+            grid.innerHTML = recordsAgents.map(agent => {
+                const status = agentStatuses.find(s => s.agent_name === agent.name);
+                const statusClass = status?.status || 'pending';
+                const statusText = status?.status || 'pending';
+                const recordCount = status?.records_found || 0;
+
+                let icon = '';
+                if (state === 'running' && statusClass === 'running') icon = '<span class="fp-records-spinner"></span>';
+                else if (state === 'running' && statusClass === 'completed') icon = '✓';
+
+                return `
+                    <div class="fp-records-agent ${statusClass}">
+                        <div class="fp-records-agent-header">
+                            <div class="fp-records-agent-icon">${RECORDS_AGENT_ICONS[agent.name] || '🤖'}</div>
+                            <div class="fp-records-agent-name">${agent.name}</div>
+                            <div class="fp-records-agent-status ${statusClass}">${icon || statusText}</div>
+                        </div>
+                        <div class="fp-records-agent-desc">${agent.description}</div>
+                        <div class="fp-records-agent-meta">
+                            <span class="count">${recordCount} records</span>
+                            <span>${agent.method}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function startRecordsSync() {
+            const address = document.getElementById('recordsAddressInput').value.trim();
+            const county = document.getElementById('recordsCountySelect').value;
+            if (!address) { alert('Enter an address or APN'); return; }
+
+            const btn = document.getElementById('recordsSyncBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="fp-records-spinner"></span> Syncing...';
+
+            // Show agents as running
+            renderRecordsAgents([], 'running');
+            document.getElementById('recordsResultsSection').style.display = 'none';
+
+            try {
+                const result = await apiCall('/records/sync', 'POST', { address, county, state: 'CA' });
+                activeSyncId = result.search_id;
+
+                // Fetch the full results
+                await loadSyncResults(result.search_id);
+            } catch (e) {
+                alert('Sync failed: ' + e.message);
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Sync Records';
+            loadRecordsHistory();
+        }
+
+        async function loadSyncResults(syncId) {
+            try {
+                const data = await apiCall('/records/sync/' + syncId, 'GET');
+
+                // Render agent statuses
+                renderRecordsAgents(data.agents, 'running');
+
+                // Render records
+                const resultsContainer = document.getElementById('recordsResults');
+                const resultsSection = document.getElementById('recordsResultsSection');
+
+                if (data.records.length > 0) {
+                    resultsSection.style.display = 'block';
+                    resultsContainer.innerHTML = data.records.map(r => {
+                        const confPct = Math.round((r.confidence || 0) * 100);
+                        const confColor = r.confidence >= 0.7 ? 'var(--success)' : r.confidence >= 0.4 ? 'var(--warning)' : 'var(--danger)';
+                        let dataText = '';
+                        try {
+                            const parsed = JSON.parse(r.data_json);
+                            if (parsed.note) dataText = parsed.note;
+                            else if (parsed.context) dataText = parsed.context;
+                            else dataText = JSON.stringify(parsed, null, 2).substring(0, 200);
+                        } catch (e) { dataText = (r.data_json || '').substring(0, 200); }
+
+                        return `
+                            <div class="fp-record-card">
+                                <div class="fp-record-card-header">
+                                    <span class="fp-record-card-type ${r.record_type}">${r.record_type.replace(/_/g, ' ')}</span>
+                                </div>
+                                <div class="fp-record-card-title">${r.title}</div>
+                                <div class="fp-record-card-source">
+                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/></svg>
+                                    ${r.source}
+                                </div>
+                                ${dataText ? `<div class="fp-record-card-data">${dataText}</div>` : ''}
+                                <div class="fp-record-card-footer">
+                                    <div class="fp-record-card-conf">
+                                        ${confPct}% confidence
+                                        <div class="fp-record-card-conf-bar"><div class="fp-record-card-conf-fill" style="width:${confPct}%;background:${confColor};"></div></div>
+                                    </div>
+                                    <div class="fp-record-card-date">${r.date_filed || '—'}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    resultsSection.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('loadSyncResults error:', e);
+            }
+        }
+
+        async function loadRecordsHistory() {
+            try {
+                const searches = await apiCall('/records/searches', 'GET');
+                const container = document.getElementById('recordsHistoryList');
+                if (searches.length === 0) {
+                    container.innerHTML = '<p style="font-size:12px;color:var(--text-tertiary);padding:8px 0;">No syncs yet.</p>';
+                    return;
+                }
+                container.innerHTML = searches.slice(0, 10).map(s => `
+                    <div class="fp-records-history-item" onclick="loadSyncResults('${s.id}'); document.getElementById('recordsAddressInput').value='${s.address || s.apn || ''}';">
+                        <div class="addr">${s.address || 'APN ' + s.apn}</div>
+                        <div class="meta">
+                            <span>${s.county}</span>
+                            <span>${s.total_records} records</span>
+                            <span>${s.status}</span>
+                            <span>${new Date(s.created_date).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { console.error('loadRecordsHistory error:', e); }
+        }
+
+        document.getElementById('recordsSyncBtn').addEventListener('click', startRecordsSync);
+        document.getElementById('recordsAddressInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') startRecordsSync();
+        });
+
         // ===== Init: Load real data on page load =====
         loadCaseContext();
-        loadProjects(); // Load projects for sidebar badge
+        loadProjects();
+        loadRecordsAgents();
+        loadRecordsHistory(); // Load projects for sidebar badge
         setTimeout(drawGraphEdges, 100);
         window.addEventListener('resize', () => setTimeout(drawGraphEdges, 100));
     </script>
