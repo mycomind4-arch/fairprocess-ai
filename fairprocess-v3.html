@@ -1962,59 +1962,29 @@
     ================================================================ -->
     <script>
         /**
-         * FairProcess V3 — Cloudflare AI Orchestration Layer
-         *
-         * Architecture:
-         * - Cloudflare Workers: Orchestration routing (agentGateway)
-         * - Cloudflare AI Models: LLM inference (@cf/meta/llama-3-8b-instruct)
-         * - Cloudflare Vectorize: Knowledge Graph embeddings (@cf/baai/bge-base-en-v1.5)
-         * - Cloudflare D1: Relational data (CaseContext, AgentRun, AgentInvocation)
-         * - Cloudflare R2: Document storage
-         * - Cloudflare Access: Authentication
-         *
-         * Agent Core (from spec):
-         * - agentGateway: single entry point for all pages
-         * - orchestrator: two-tier routing (deterministic + LLM planning)
-         * - Specialist agents: fact_extraction, timeline, statute_matching,
-         *   discrepancy, document
-         * - CaseContext: shared state read/written by all agents
-         * - AgentRun: audit ledger entry per agent invocation (SHA-256 hashed)
-         * - Neutrality guardrail: "You identify evidentiary status. You do not
-         *   render legal conclusions."
+         * FairProcess V3 — Wired to Cloudflare Worker
+         * Backend: https://fairprocess-gateway.mailmypdf.workers.dev
+         * D1 (CaseContext, AgentRun, AgentInvocation) + R2 + Workers AI (Llama 3.3 70B)
          */
 
+        const WORKER_URL = 'https://fairprocess-gateway.mailmypdf.workers.dev';
+        const CASE_ID = 'CE26-0402';
+        const CF_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+        const GUARDRAIL = 'You identify evidentiary status. You do not render legal conclusions.';
+
         const CONFIG = {
-            API_BASE: 'https://fairprocess.workers.dev',
-            AI_ENDPOINT: 'https://fairprocess-ai.workers.dev',
-            VECTORIZE_ENDPOINT: 'https://fairprocess-vectorize.workers.dev',
-            DEFAULT_MODEL: '@cf/meta/llama-3-8b-instruct',
-            EMBEDDING_MODEL: '@cf/baai/bge-base-en-v1.5',
-            MAX_TOKENS: 4096,
-            TEMPERATURE: 0.7,
-            GUARDRAIL: 'You identify evidentiary status. You do not render legal conclusions.',
+            API_BASE: WORKER_URL,
+            DEFAULT_MODEL: CF_MODEL,
+            GUARDRAIL: GUARDRAIL,
             AGENTS: {
-                planning: { name: 'Planning Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You are a Planning Department expert. Answer zoning, land use, and permit questions. ' },
-                building: { name: 'Building Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You are a Building & Safety expert. Answer code, inspection, and construction questions. ' },
-                environmental: { name: 'Environmental Health Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You are an Environmental Health expert. Answer health, hazmat, and water quality questions. ' },
-                fire: { name: 'Fire Department Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You are a Fire Department expert. Answer fire safety and defensible space questions. ' },
-                orchestrator: { name: 'Orchestrator', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You coordinate specialist agents. Select the minimal subset needed. ' },
-                statute_matching: { name: 'Statute Matching Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You match events to statutes and evaluate deadline math. Output: matches expected window | deviation detected | unable to determine. ' },
-                timeline: { name: 'Timeline Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You sequence events, compute elapsed time, and flag gaps. ' },
-                discrepancy: { name: 'Discrepancy Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You characterize conflicts between sources. You cite both sources. You do not resolve which is correct. ' },
-                fact_extraction: { name: 'Fact Extraction Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You extract dated facts, parties, and references from documents. ' },
-                document: { name: 'Document Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You hash, classify, and route documents. ' }
-            },
-            JURISDICTION: {
-                humboldt: {
-                    code: 'HC',
-                    agencies: ['planning', 'building', 'environmental', 'fire'],
-                    statutes: ['HCC § 351-7', 'HCC § 351-12', 'CA Gov Code § 65852.2', 'HCC § 4.2']
-                }
+                statute_matching: { name: 'Statute Matching Agent', icon: '⚖️' },
+                timeline: { name: 'Timeline Agent', icon: '📅' },
+                discrepancy: { name: 'Discrepancy Agent', icon: '🔍' },
+                fact_extraction: { name: 'Fact Extraction Agent', icon: '🔎' },
+                document: { name: 'Document Agent', icon: '📄' },
+                orchestrator: { name: 'Orchestrator', icon: '🧠' }
             }
         };
-
-        // Append guardrail to every agent system prompt
-        Object.values(CONFIG.AGENTS).forEach(a => a.systemPrompt += CONFIG.GUARDRAIL);
 
         const state = {
             currentPage: 'assistant',
@@ -2022,20 +1992,133 @@
             agentProgress: 0,
             transcriptLines: [],
             isPaused: false,
-            selectedJurisdiction: 'humboldt',
-            activeAgents: ['planning', 'building', 'environmental'],
-            conversationHistory: [],
-            caseContext: {
-                case_id: 'CE26-0402',
-                verified_facts: 14,
-                open_discrepancies: 3,
-                active_statutes: 5,
-                evidence_items: 8
-            }
+            isProcessing: false,
+            caseContext: { case_id: CASE_ID, verified_facts: [], open_discrepancies: [], active_statutes: [] }
         };
 
         const $ = (s) => document.querySelector(s);
         const $$ = (s) => document.querySelectorAll(s);
+
+        // ===== API: Gateway (the real hook) =====
+        async function callAgentGateway(message, pageContext) {
+            const response = await fetch(`${WORKER_URL}/gateway`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    case_id: CASE_ID,
+                    message: message,
+                    page_context: pageContext || state.currentPage
+                })
+            });
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(`Gateway error ${response.status}: ${err}`);
+            }
+            return await response.json();
+        }
+
+        // ===== API: Load Case Context =====
+        async function loadCaseContext() {
+            try {
+                const res = await fetch(`${WORKER_URL}/case?case_id=${CASE_ID}`);
+                if (!res.ok) return;
+                const ctx = await res.json();
+                state.caseContext = ctx;
+
+                // Update the context bar chips
+                const factsCount = ctx.verified_facts?.length || 0;
+                const discCount = ctx.open_discrepancies?.length || 0;
+                const statCount = ctx.active_statutes?.length || 0;
+                const evidenceCount = ctx.evidence_items?.length || 0;
+
+                const chips = document.querySelectorAll('.fp-ctx-bar .fp-ctx-chip');
+                if (chips.length >= 5) {
+                    chips[1].innerHTML = `<span class="count">${factsCount}</span> Verified Facts`;
+                    chips[2].innerHTML = `<span class="count" style="color:var(--warning)">${discCount}</span> Discrepancies`;
+                    chips[3].innerHTML = `<span class="count">${statCount}</span> Active Statutes`;
+                    chips[4].innerHTML = `<span class="count">${evidenceCount}</span> Evidence Items`;
+                }
+
+                // Update sync indicator
+                const sync = document.querySelector('.fp-ctx-sync');
+                if (sync) sync.innerHTML = '<span class="dot" style="background:var(--success);"></span> Context synced just now';
+            } catch (e) {
+                console.error('loadCaseContext:', e);
+            }
+        }
+
+        // ===== API: Load Ledger =====
+        async function loadLedger() {
+            try {
+                const res = await fetch(`${WORKER_URL}/ledger?case_id=${CASE_ID}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const entries = data.ledger || [];
+
+                // Update stat tiles
+                const stats = document.querySelectorAll('#page-ledger .fp-stat .fp-stat-value');
+                if (stats.length >= 4) {
+                    stats[0].textContent = entries.length;
+                    const agentEntries = entries.filter(e => e.triggered_by === 'system' || e.agent_name);
+                    stats[1].textContent = agentEntries.length;
+                    stats[2].textContent = '0';
+                    const guardrailCount = entries.filter(e => {
+                        try { const o = JSON.parse(e.output || '{}'); return o.guardrail_blocks?.length > 0; } catch { return false; }
+                    }).length;
+                    stats[3].textContent = guardrailCount;
+                }
+
+                // Render ledger entries
+                const ledgerPanel = document.querySelector('#page-ledger .fp-panel');
+                if (!ledgerPanel) return;
+
+                // Keep the header, replace the entries
+                const header = ledgerPanel.querySelector('.fp-panel-header');
+                ledgerPanel.innerHTML = '';
+                if (header) ledgerPanel.appendChild(header);
+
+                for (const entry of entries.slice(0, 20)) {
+                    const isAgent = entry.agent_name && entry.agent_name !== 'Jim';
+                    const icon = isAgent ? '🤖' : '👤';
+                    const iconClass = isAgent ? 'agent' : 'human';
+                    const hash = entry.ledger_hash ? entry.ledger_hash.substring(0, 12) : '--------';
+                    const date = entry.created_date ? new Date(entry.created_date + 'Z').toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                    const status = entry.status || 'unknown';
+                    const statusColor = status === 'success' ? 'success' : status === 'error' ? 'danger' : 'warning';
+
+                    let metaParts = [date, `status: ${status}`];
+                    try {
+                        const output = JSON.parse(entry.output || '{}');
+                        if (output.results?.length) metaParts.push(`${output.results.length} statute checks`);
+                        if (output.conflicts?.length) metaParts.push(`${output.conflicts.length} conflicts`);
+                        if (output.facts?.length) metaParts.push(`${output.facts.length} facts extracted`);
+                        if (output.events?.length) metaParts.push(`${output.events.length} timeline events`);
+                        if (output.error) metaParts.push(`error: ${output.error.substring(0, 60)}`);
+                    } catch {}
+
+                    const div = document.createElement('div');
+                    div.className = 'fp-ledger-entry';
+                    div.innerHTML = `
+                        <div class="fp-ledger-icon ${iconClass}">${icon}</div>
+                        <div class="fp-ledger-content">
+                            <div class="fp-ledger-title">${entry.agent_name || 'Unknown'} — ${entry.case_id}</div>
+                            <div class="fp-ledger-meta">${metaParts.join(' · ')}</div>
+                        </div>
+                        <div class="fp-ledger-hash">${hash}</div>
+                    `;
+                    ledgerPanel.appendChild(div);
+                }
+
+                if (entries.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.style.cssText = 'padding:32px;text-align:center;color:var(--text-tertiary);';
+                    empty.textContent = 'No ledger entries yet. Run an agent analysis to generate entries.';
+                    ledgerPanel.appendChild(empty);
+                }
+            } catch (e) {
+                console.error('loadLedger:', e);
+            }
+        }
 
         // ===== Navigation =====
         $$('.fp-nav-item').forEach(item => {
@@ -2049,23 +2132,18 @@
                 const target = document.getElementById('page-' + page);
                 if (target) target.classList.add('active');
                 state.currentPage = page;
+
+                // Lazy-load data when navigating to ledger or evidence pages
+                if (page === 'ledger') loadLedger();
             });
         });
 
-        // ===== Global Search =====
-        const searchInput = document.getElementById('globalSearch');
-        searchInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && this.value.trim()) {
-                sendChatMessage(this.value.trim());
-                this.value = '';
-            }
-        });
-
         // ===== Chat =====
-        function sendChatMessage(msg) {
+        async function sendChatMessage(msg) {
             msg = msg || document.getElementById('chatInput').value.trim();
-            if (!msg) return;
+            if (!msg || state.isProcessing) return;
             document.getElementById('chatInput').value = '';
+            state.isProcessing = true;
 
             // Navigate to assistant page
             $$('.fp-nav-item').forEach(n => n.classList.remove('active'));
@@ -2081,55 +2159,92 @@
             userMsg.innerHTML = `<div class="fp-chat-bubble user">${msg}</div>`;
             chatArea.appendChild(userMsg);
 
-            // Simulate agentGateway call
-            const agents = routeQuery(msg);
-            setTimeout(() => {
+            // Loading indicator
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'fp-chat-msg';
+            loadingMsg.id = 'loading-msg';
+            loadingMsg.innerHTML = `<div class="fp-chat-avatar ai">FP</div><div class="fp-chat-bubble ai" style="opacity:0.6;">⏳ Analyzing... routing to agents...</div>`;
+            chatArea.appendChild(loadingMsg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            try {
+                const result = await callAgentGateway(msg, 'assistant');
+
+                // Remove loading
+                document.getElementById('loading-msg')?.remove();
+
+                // Build response HTML from real gateway output
+                let responseHtml = result.response_text || 'Analysis complete.';
+
+                // Add statute results if available
+                if (result.statute_results?.length > 0) {
+                    responseHtml += '<div style="margin-top:8px;font-size:12px;">';
+                    for (const r of result.statute_results.slice(0, 4)) {
+                        const color = r.status === 'deviation detected' ? 'var(--danger)' : 'var(--success)';
+                        responseHtml += `<div style="margin-top:4px;padding:4px 8px;border-radius:6px;background:var(--surface-muted);"><strong>${r.statute_ref}</strong> — ${r.status} <span style="color:${color};">●</span> ${r.note || ''}</div>`;
+                    }
+                    responseHtml += '</div>';
+                }
+
+                // Add discrepancy results
+                if (result.new_discrepancies?.length > 0) {
+                    responseHtml += '<div style="margin-top:8px;font-size:12px;">';
+                    for (const c of result.new_discrepancies.slice(0, 3)) {
+                        responseHtml += `<div style="margin-top:4px;padding:4px 8px;border-radius:6px;background:rgba(245,158,11,0.08);"><strong>⚠ ${c.conflict_type || 'Conflict'}</strong>: ${c.characterization || ''}</div>`;
+                    }
+                    responseHtml += '</div>';
+                }
+
+                // Agent tags
+                const agentTags = (result.agents_used || []).map(a => {
+                    const agent = CONFIG.AGENTS[a] || { name: a, icon: '🤖' };
+                    return `<span class="fp-tag accent">${agent.icon || ''} ${agent.name || a}</span>`;
+                }).join('');
+
+                // Guardrail badge
+                const guardrailBadge = result.guardrail ? `<span class="fp-tag" style="background:rgba(34,197,94,0.1);color:var(--success);font-size:10px;">🛡️ Guardrail active</span>` : '';
+
+                // Model badge
+                const modelBadge = `<span class="fp-tag" style="font-size:10px;color:var(--text-tertiary);">${result.llm_model || CF_MODEL}</span>`;
+
                 const aiMsg = document.createElement('div');
                 aiMsg.className = 'fp-chat-msg';
-                const response = generateResponse(msg, agents);
                 aiMsg.innerHTML = `
                     <div class="fp-chat-avatar ai">FP</div>
                     <div class="fp-chat-bubble ai">
-                        ${response.text}
-                        <div class="agents-tag">${agents.map(a => `<span class="fp-tag accent">${a}</span>`).join('')}</div>
+                        ${responseHtml}
+                        <div class="agents-tag">${agentTags} ${guardrailBadge} ${modelBadge}</div>
                     </div>
                 `;
                 chatArea.appendChild(aiMsg);
                 chatArea.scrollTop = chatArea.scrollHeight;
-            }, 800);
+
+                // Refresh case context and ledger in background
+                loadCaseContext();
+            } catch (err) {
+                document.getElementById('loading-msg')?.remove();
+                const errMsg = document.createElement('div');
+                errMsg.className = 'fp-chat-msg';
+                errMsg.innerHTML = `<div class="fp-chat-avatar ai">FP</div><div class="fp-chat-bubble ai" style="color:var(--danger);">⚠ Error: ${err.message}</div>`;
+                chatArea.appendChild(errMsg);
+                chatArea.scrollTop = chatArea.scrollHeight;
+            } finally {
+                state.isProcessing = false;
+            }
         }
 
         document.getElementById('chatInput').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') sendChatMessage();
         });
 
-        // ===== Tier 1 Routing (deterministic) =====
-        function routeQuery(query) {
-            const q = query.toLowerCase();
-            if (q.includes('compliant') || q.includes('deadline') || q.includes('on time') || q.includes('mailing'))
-                return ['timeline_agent', 'statute_matching_agent'];
-            if (q.includes('discrepanc') || q.includes('conflict') || q.includes('mismatch'))
-                return ['discrepancy_agent'];
-            if (q.includes('upload') || q.includes('document'))
-                return ['document_agent', 'fact_extraction_agent'];
-            if (q.includes('timeline') || q.includes('sequence') || q.includes('when'))
-                return ['timeline_agent'];
-            if (q.includes('statute') || q.includes('rule') || q.includes('code'))
-                return ['statute_matching_agent'];
-            // Tier 2 fallback
-            return ['orchestrator', 'statute_matching_agent', 'timeline_agent'];
-        }
-
-        function generateResponse(query, agents) {
-            const q = query.toLowerCase();
-            if (q.includes('compliant') || q.includes('deadline') || q.includes('mailing')) {
-                return { text: 'The citation in CE26-0402 was executed on Jul 15 and postmarked Jul 24 — a 9-day gap. HCC § 351-7 requires mailing within 3 business days. The statute_matching_agent labels this as <strong>"deviation detected"</strong> (not "non-compliant" — that would be a legal conclusion). The discrepancy_agent also flagged a conflict between the claimed mailing date (Jul 22) and the postmark (Jul 24).' };
+        // ===== Global Search =====
+        const searchInput = document.getElementById('globalSearch');
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && this.value.trim()) {
+                sendChatMessage(this.value.trim());
+                this.value = '';
             }
-            if (q.includes('discrepanc') || q.includes('conflict')) {
-                return { text: 'I found 3 discrepancies in CE26-0402. The most significant: the citation document claims a mailing date of Jul 22, but the USPS postmark shows Jul 24. The discrepancy_agent has characterized this conflict but has not determined which date is accurate — that requires human review.' };
-            }
-            return { text: 'I\'ve routed your query to the relevant agents. Based on the current case context (CE26-0402), I can see 14 verified facts, 3 open discrepancies, and 5 active statutes. What specific aspect would you like me to analyze?' };
-        }
+        });
 
         // ===== Agent Mode =====
         const agentToggle = document.getElementById('agentToggle');
@@ -2191,38 +2306,83 @@
         async function runAgentWorkflow() {
             if (!state.agentMode || state.isPaused) return;
 
-            const steps = [
-                { icon: '📄', text: 'Document loaded: citation_CE26-0402.pdf', delay: 600, agent: 'document' },
-                { icon: '🔎', text: 'Extracting facts from citation...', delay: 800, agent: 'fact_extraction' },
-                { icon: '✅', text: 'Extracted 8 facts (dates, parties, references)', delay: 500, agent: 'fact_extraction' },
-                { icon: '📅', text: 'Sequencing events on timeline...', delay: 700, agent: 'timeline' },
-                { icon: '⚠️', text: 'Gap detected: 9 days between execution and postmark', delay: 600, agent: 'timeline' },
-                { icon: '⚖️', text: 'Matching against HCC § 351-7 (3-business-day window)...', delay: 900, agent: 'statute_matching' },
-                { icon: '🔍', text: 'Comparing citation mailing date vs postmark date...', delay: 700, agent: 'discrepancy' },
-                { icon: '🚫', text: 'Guardrail block: "non-compliant" → "deviation detected"', delay: 400, agent: 'statute_matching' },
-                { icon: '✅', text: 'CaseContext updated: 1 new discrepancy, 1 deviation flagged', delay: 500, agent: 'orchestrator' },
-                { icon: '📊', text: 'AgentRun records written to ledger (3 entries, SHA-256 hashed)', delay: 400, agent: 'orchestrator' },
-                { icon: '🎉', text: 'Analysis complete. Response ready for human review.', delay: 300, agent: 'orchestrator' }
-            ];
+            addTranscriptLine('🧠', 'Routing query through agentGateway...', 'done', 'Orchestrator');
+            updateAgentProgress(10);
 
-            const totalSteps = steps.length;
-            let completed = 0;
+            addTranscriptLine('📦', `Loading CaseContext for ${CASE_ID} from D1...`, 'done', 'Orchestrator');
+            updateAgentProgress(20);
+            await new Promise(r => setTimeout(r, 400));
 
-            for (const step of steps) {
-                if (!state.agentMode || state.isPaused) return;
-                await new Promise(resolve => setTimeout(resolve, step.delay));
-                const agent = CONFIG.AGENTS[step.agent];
-                addTranscriptLine(step.icon, step.text, 'done', agent.name);
-                completed++;
-                state.agentProgress = Math.round((completed / totalSteps) * 100);
-                updateAgentProgress();
-                updateAgentInsights(completed, totalSteps);
+            addTranscriptLine('🔀', 'Tier 1 routing: matching query to agents...', 'pending', 'Orchestrator');
+            updateAgentProgress(30);
+            await new Promise(r => setTimeout(r, 500));
+
+            try {
+                addTranscriptLine('⚡', 'Executing agents via Workers AI (Llama 3.3 70B)...', 'pending', 'Orchestrator');
+                updateAgentProgress(40);
+
+                const result = await callAgentGateway('Check statute compliance and discrepancies for this case', state.currentPage);
+
+                addTranscriptLine('⚡', 'Agents executed via Workers AI (Llama 3.3 70B)', 'done', 'Orchestrator');
+                updateAgentProgress(70);
+
+                // Display each agent's results
+                if (result.statute_results?.length > 0) {
+                    for (const r of result.statute_results.slice(0, 4)) {
+                        const icon = r.status === 'deviation detected' ? '⚠️' : '✅';
+                        const note = r.note ? ` — ${r.note.substring(0, 80)}` : '';
+                        addTranscriptLine(icon, `${r.statute_ref}: ${r.status}${note}`, 'done', 'Statute Matching Agent');
+                    }
+                }
+
+                if (result.new_discrepancies?.length > 0) {
+                    for (const c of result.new_discrepancies.slice(0, 3)) {
+                        addTranscriptLine('🔍', `Conflict: ${c.characterization?.substring(0, 80) || c.conflict_type}`, 'done', 'Discrepancy Agent');
+                    }
+                }
+
+                if (result.timeline_events?.length > 0) {
+                    addTranscriptLine('📅', `${result.timeline_events.length} events sequenced, ${result.timeline_gaps?.length || 0} gaps found`, 'done', 'Timeline Agent');
+                }
+
+                // Ledger entries
+                if (result.ledger_entries?.length > 0) {
+                    for (const l of result.ledger_entries) {
+                        addTranscriptLine('📊', `${l.agent}: ${l.status} (hash: ${l.hash})`, 'done', 'Audit Ledger');
+                    }
+                }
+
+                // Guardrail info
+                if (result.guardrail_blocks?.length > 0) {
+                    for (const b of result.guardrail_blocks.slice(0, 2)) {
+                        addTranscriptLine('🛡️', `Guardrail: "${b.blocked}" → "${b.replacement}"`, 'done', 'Neutrality Guardrail');
+                    }
+                } else {
+                    addTranscriptLine('🛡️', 'Guardrail active — no blocks needed this run', 'done', 'Neutrality Guardrail');
+                }
+
+                addTranscriptLine('✅', `CaseContext updated: ${result.updated_fields?.join(', ') || 'no changes'}`, 'done', 'Orchestrator');
+                updateAgentProgress(90);
+
+                addTranscriptLine('📊', `${result.ledger_entries?.length || 0} AgentRun records written to D1 ledger (SHA-256 hashed)`, 'done', 'Audit Ledger');
+                updateAgentProgress(95);
+
+                // Update insights with real data
+                updateAgentInsightsReal(result);
+
+                addTranscriptLine('🎉', 'Analysis complete. Response ready for human review.', 'done', 'Orchestrator');
+                updateAgentProgress(100);
+
+                document.querySelector('.fp-agent-status .dot').style.background = 'var(--success)';
+                document.getElementById('progressSub').textContent = '🎉 Complete!';
+
+                // Refresh context and ledger
+                loadCaseContext();
+            } catch (err) {
+                addTranscriptLine('❌', `Error: ${err.message}`, 'done', 'System');
+                updateAgentProgress(100);
+                document.getElementById('progressSub').textContent = '⚠ Error';
             }
-
-            state.agentProgress = 100;
-            updateAgentProgress();
-            document.querySelector('.fp-agent-status .dot').style.background = 'var(--success)';
-            document.getElementById('progressSub').textContent = '🎉 Complete!';
         }
 
         function addTranscriptLine(icon, text, status, agent) {
@@ -2239,60 +2399,46 @@
             document.getElementById('transcriptHeader').textContent = `📝 Live Transcript (${count} events)`;
         }
 
-        function updateAgentProgress() {
-            document.getElementById('agentProgressFill').style.width = `${state.agentProgress}%`;
-            document.getElementById('progressSub').textContent = `${state.agentProgress}% complete`;
-            document.getElementById('progressSteps').textContent = `📋 ${Math.round(state.agentProgress / 9.1)} of 11 steps`;
-            document.getElementById('progressTime').textContent = state.agentProgress < 100 ? `⏱ Est. ${Math.ceil((100 - state.agentProgress) * 0.5)}s remaining` : '⏱ Complete';
+        function updateAgentProgress(pct) {
+            state.agentProgress = pct;
+            document.getElementById('agentProgressFill').style.width = `${pct}%`;
+            document.getElementById('progressSub').textContent = `${pct}% complete`;
+            document.getElementById('progressSteps').textContent = `📋 ${Math.round(pct / 9.1)} of 11 steps`;
+            document.getElementById('progressTime').textContent = pct < 100 ? `⏱ Est. ${Math.ceil((100 - pct) * 0.3)}s remaining` : '⏱ Complete';
         }
 
-        function updateAgentInsights(completed, total) {
+        function updateAgentInsightsReal(result) {
             const insights = document.getElementById('agentInsights');
-            const data = [
-                { label: '📅 Timeline', value: '9 days: execution → postmark', badge: 'danger', badgeText: 'Gap flagged' },
-                { label: '⚖️ Statute', value: 'HCC § 351-7 requires ≤ 3 business days', badge: 'danger', badgeText: 'Deviation' },
-                { label: '🔍 Discrepancy', value: 'Citation date vs postmark date conflict', badge: 'warning', badgeText: '2 sources' },
-                { label: '🛡️ Guardrail', value: '"non-compliant" blocked → "deviation detected"', badge: 'success', badgeText: 'Rewritten' }
-            ];
-            const showCount = Math.min(completed, data.length);
+            if (!insights) return;
             let html = '<div class="fp-agent-insights-header">💡 Live Insights</div>';
-            for (let i = 0; i < showCount; i++) {
-                const d = data[i];
-                html += `<div class="fp-agent-insight"><div class="label">${d.label}</div><div class="value">${d.value} <span class="badge ${d.badge}">${d.badgeText}</span></div></div>`;
+
+            // Statute insights
+            if (result.statute_results?.length > 0) {
+                const deviations = result.statute_results.filter(r => r.status === 'deviation detected');
+                const matches = result.statute_results.filter(r => r.status === 'matches expected window');
+                if (deviations.length > 0) {
+                    const d = deviations[0];
+                    html += `<div class="fp-agent-insight"><div class="label">⚖️ Statute</div><div class="value">${d.statute_ref}: ${d.note?.substring(0, 60) || d.status} <span class="badge danger">Deviation</span></div></div>`;
+                }
+                if (matches.length > 0) {
+                    const m = matches[0];
+                    html += `<div class="fp-agent-insight"><div class="label">✅ Matches</div><div class="value">${m.statute_ref}: within window <span class="badge success">OK</span></div></div>`;
+                }
             }
+
+            // Discrepancy insights
+            if (result.new_discrepancies?.length > 0) {
+                const c = result.new_discrepancies[0];
+                html += `<div class="fp-agent-insight"><div class="label">🔍 Discrepancy</div><div class="value">${c.characterization?.substring(0, 60) || c.conflict_type} <span class="badge warning">${result.new_discrepancies.length} found</span></div></div>`;
+            }
+
+            // Guardrail insight
+            html += `<div class="fp-agent-insight"><div class="label">🛡️ Guardrail</div><div class="value">Neutrality enforced — ${result.guardrail_blocks?.length || 0} blocks <span class="badge success">Active</span></div></div>`;
+
+            // Model
+            html += `<div class="fp-agent-insight"><div class="label">🤖 Model</div><div class="value">${result.llm_model || CF_MODEL} <span class="badge accent">Workers AI</span></div></div>`;
+
             insights.innerHTML = html;
-        }
-
-        // ===== Cloudflare AI API (stubs for production wiring) =====
-        async function callCloudflareAI(prompt, model) {
-            // PRODUCTION:
-            // const res = await fetch(`${CONFIG.AI_ENDPOINT}/infer`, {
-            //     method: 'POST', headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify({ prompt, model, max_tokens: CONFIG.MAX_TOKENS })
-            // });
-            // return await res.json();
-            console.log(`🧠 Cloudflare AI: ${model || CONFIG.DEFAULT_MODEL}`);
-            await new Promise(r => setTimeout(r, 300));
-            return { success: true, response: 'Simulated response', model: model || CONFIG.DEFAULT_MODEL };
-        }
-
-        async function agentGateway(caseId, pageContext, message, attachmentIds) {
-            // PRODUCTION: POST to CONFIG.API_BASE/agentGateway
-            // 1. Load CaseContext for caseId
-            // 2. Run orchestrator (Tier 1 rules → Tier 2 LLM)
-            // 3. Execute selected agents (parallel/sequential)
-            // 4. Merge outputs, update CaseContext
-            // 5. Write AgentRun per agent (SHA-256 hashed)
-            // 6. Return structured response
-            const agents = routeQuery(message);
-            return { response_text: 'Analysis complete', agents_used: agents, updated_fields: ['open_discrepancies'] };
-        }
-
-        async function queryKnowledgeGraph(query) {
-            // PRODUCTION: POST to CONFIG.VECTORIZE_ENDPOINT/search
-            console.log(`🌐 Vectorize: ${query}`);
-            await new Promise(r => setTimeout(r, 200));
-            return { success: true, results: [{ node: 'HCC § 351-7', relevance: 0.95 }] };
         }
 
         // ===== Keyboard Shortcuts =====
@@ -2317,15 +2463,16 @@
             const svg = document.getElementById('graphSvg');
             if (!svg) return;
             const graph = document.getElementById('agentGraph');
+            if (!graph) return;
             const nodes = graph.querySelectorAll('.fp-graph-node');
             const graphRect = graph.getBoundingClientRect();
-            // Clear existing edges
             svg.innerHTML = `<defs><marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#cbd5e1" /></marker></defs>`;
-            // Orchestrator → first row
             const orch = nodes[0];
+            if (!orch) return;
             const orchRect = orch.getBoundingClientRect();
             for (let i = 1; i <= 4; i++) {
                 const node = nodes[i];
+                if (!node) continue;
                 const nodeRect = node.getBoundingClientRect();
                 const x1 = orchRect.left - graphRect.left + orchRect.width / 2;
                 const y1 = orchRect.bottom - graphRect.top;
@@ -2338,13 +2485,14 @@
                 line.setAttribute('stroke-dasharray', '4 2');
                 svg.appendChild(line);
             }
-            // First row → second row
             for (let i = 1; i <= 4; i++) {
                 const top = nodes[i];
+                if (!top) continue;
                 const topRect = top.getBoundingClientRect();
                 for (let j = 5; j <= 7; j++) {
                     if ((i === 1 && j === 5) || (i === 2 && j === 6) || (i === 3 && j === 7) || (i === 4 && j === 6)) {
                         const bot = nodes[j];
+                        if (!bot) continue;
                         const botRect = bot.getBoundingClientRect();
                         const x1 = topRect.left - graphRect.left + topRect.width / 2;
                         const y1 = topRect.bottom - graphRect.top;
@@ -2359,7 +2507,6 @@
                     }
                 }
             }
-            // Second row → third row
             for (let i = 5; i <= 7; i++) {
                 const top = nodes[i];
                 if (!top) continue;
@@ -2384,7 +2531,8 @@
             }
         }
 
-        // Draw edges after layout settles
+        // ===== Init: Load real data on page load =====
+        loadCaseContext();
         setTimeout(drawGraphEdges, 100);
         window.addEventListener('resize', () => setTimeout(drawGraphEdges, 100));
     </script>
