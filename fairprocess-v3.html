@@ -3008,7 +3008,8 @@
                 `);
             } catch (e) {
                 console.error('loadProjects error:', e);
-                document.getElementById('projectsGrid').innerHTML = '<div style="text-align:center;padding:48px;color:var(--danger);grid-column:1/-1;"><p style="font-size:14px;">Failed to load projects. Is the Worker running?</p></div>';
+                document.getElementById('projectsGrid').innerHTML = '<div style="text-align:center;padding:48px;color:var(--danger);grid-column:1/-1;"><div style="font-size:32px;margin-bottom:8px;">⚠️</div><p style="font-size:14px;">Failed to load projects. Retrying...</p></div>';
+                setTimeout(loadProjects, 3000); // Auto-retry once
             }
         }
 
@@ -3224,45 +3225,70 @@
             }
         });
 
-        // Document upload (metadata only for now — R2 upload in Phase 2)
+        // Document upload to R2 storage
         document.getElementById('pwDocUpload').addEventListener('click', () => {
             if (!activeProjectId) { alert('Open a project first'); return; }
             const input = document.createElement('input');
             input.type = 'file';
             input.multiple = true;
             input.onchange = async (e) => {
+                const uploadArea = document.getElementById('pwDocUpload');
+                const originalText = uploadArea.querySelector('.text').textContent;
+                uploadArea.querySelector('.text').textContent = `Uploading ${e.target.files.length} file(s)...`;
+                uploadArea.style.pointerEvents = 'none';
+
                 for (const file of e.target.files) {
-                    const docType = file.type.includes('pdf') ? 'pdf' : file.type.includes('image') ? 'img' : 'doc';
                     try {
-                        await apiCall('/projects/' + activeProjectId + '/documents', 'POST', {
-                            name: file.name,
-                            doc_type: docType,
-                            source: 'upload',
-                            mime_type: file.type,
-                            size_bytes: file.size
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const res = await fetch(API + '/projects/' + activeProjectId + '/upload', {
+                            method: 'POST',
+                            body: formData
                         });
+                        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+                        const result = await res.json();
+                        console.log('Uploaded:', result);
                     } catch (err) { console.error('Upload error:', err); }
                 }
-                // Reload project
+
+                uploadArea.querySelector('.text').textContent = originalText;
+                uploadArea.style.pointerEvents = '';
+                // Reload project to show new documents
                 await openProject(activeProjectId);
             };
             input.click();
         });
 
-        // Extract evidence button
+        // Drag and drop support
+        const dropZone = document.getElementById('pwDocUpload');
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--accent)'; dropZone.style.background = 'var(--accent-light)'; });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.style.borderColor = ''; dropZone.style.background = ''; });
+        });
+        dropZone.addEventListener('drop', (e) => {
+            if (!activeProjectId) return;
+            const files = e.dataTransfer.files;
+            if (files.length === 0) return;
+            const formData = new FormData();
+            for (const file of files) formData.append('file', file);
+            fetch(API + '/projects/' + activeProjectId + '/upload', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(() => openProject(activeProjectId))
+                .catch(err => console.error('Drop upload error:', err));
+        });
+
+        // Extract evidence button — runs full extraction pipeline
         document.getElementById('pwExtractBtn').addEventListener('click', async () => {
             if (!activeProjectId) return;
             const btn = document.getElementById('pwExtractBtn');
             btn.textContent = 'Extracting...';
             btn.disabled = true;
             try {
-                // Call gateway to run fact extraction on project documents
-                const result = await apiCall('/gateway', 'POST', {
-                    case_id: activeProjectId,
-                    message: 'Extract evidence from all documents',
-                    page_context: 'evidence'
-                });
-                alert(`Extraction complete: ${result.agents_used.join(', ')} ran successfully.`);
+                const result = await apiCall('/projects/' + activeProjectId + '/extract', 'POST');
+                const msg = `Extraction complete!\n\nDocuments processed: ${result.documents_processed}\nFacts extracted: ${result.total_facts_extracted}\nLedger hash: ${result.ledger_hash || 'N/A'}`;
+                alert(msg);
                 await openProject(activeProjectId);
             } catch (e) {
                 alert('Extraction failed: ' + e.message);
