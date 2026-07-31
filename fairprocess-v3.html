@@ -1,0 +1,2392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FairProcess — Jurisdiction Intelligence System V3</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        /* ================================================================
+           CSS Variables (Theme — V3: deeper indigo, refined neutrals)
+           ================================================================ */
+        :root {
+            --sidebar-bg: #0a0f1a;
+            --sidebar-text: #94a3b8;
+            --sidebar-hover: rgba(255, 255, 255, 0.05);
+            --sidebar-active: rgba(99, 102, 241, 0.15);
+            --accent: #6366f1;
+            --accent-2: #8b5cf6;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --accent-light: #eef2ff;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #0ea5e9;
+            --border: #e2e8f0;
+            --surface: #ffffff;
+            --surface-muted: #f8fafc;
+            --surface-strong: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #64748b;
+            --text-quaternary: #94a3b8;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-xs: 6px;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.1);
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --transition: 0.2s ease;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font); color: var(--text-primary); background: var(--surface-strong); min-height: 100vh; overflow: hidden; }
+        button, input, select, textarea { font-family: var(--font); }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--text-quaternary); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+        /* ================================================================
+           Layout
+           ================================================================ */
+        .fp-app { display: flex; height: 100vh; }
+        .fp-sidebar { width: 240px; background: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; z-index: 10; transition: width var(--transition); }
+        .fp-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+        .fp-content { flex: 1; padding: 24px; overflow-y: auto; background: var(--surface-strong); }
+        .fp-content.agent-mode-active { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* ================================================================
+           Sidebar
+           ================================================================ */
+        .fp-logo { padding: 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 12px; }
+        .fp-logo-shield { width: 32px; height: 32px; background: linear-gradient(135deg, #6366f1, #4f46e5); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 16px; }
+        .fp-logo-text { font-size: 16px; font-weight: 700; color: white; line-height: 1.2; letter-spacing: -0.3px; }
+        .fp-logo-sub { font-size: 9px; color: var(--sidebar-text); letter-spacing: 1.2px; text-transform: uppercase; }
+
+        .fp-workspace { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .fp-workspace-btn { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: white; font-size: 13px; cursor: pointer; width: 100%; font-family: inherit; transition: background var(--transition); }
+        .fp-workspace-btn:hover { background: rgba(255,255,255,0.08); }
+        .fp-workspace-label { font-size: 10px; color: var(--sidebar-text); margin-top: 4px; padding-left: 4px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.6px; }
+
+        .fp-nav { flex: 1; padding: 8px 0; }
+        .fp-nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--sidebar-text); padding: 12px 16px 4px; opacity: 0.5; font-weight: 600; }
+        .fp-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; margin: 0 8px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--sidebar-text); transition: all var(--transition); position: relative; text-decoration: none; border: none; background: transparent; width: calc(100% - 16px); font-family: inherit; text-align: left; }
+        .fp-nav-item:hover { background: var(--sidebar-hover); color: white; }
+        .fp-nav-item.active { background: var(--sidebar-active); color: white; }
+        .fp-nav-item.active::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; background: var(--accent); border-radius: 0 3px 3px 0; }
+        .fp-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+        .fp-nav-badge { margin-left: auto; font-size: 11px; background: var(--accent); color: white; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
+        .fp-nav-badge.agent { background: linear-gradient(135deg, #6366f1, #8b5cf6); animation: pulse-badge 2s infinite; }
+        .fp-nav-badge.danger { background: var(--danger); }
+        .fp-nav-badge.warning { background: var(--warning); }
+        @keyframes pulse-badge { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .fp-quick { padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+        .fp-quick-item { display: flex; align-items: center; gap: 8px; padding: 6px 16px; font-size: 12px; color: var(--sidebar-text); cursor: pointer; border: none; background: transparent; width: 100%; font-family: inherit; text-align: left; transition: color var(--transition); }
+        .fp-quick-item:hover { color: white; }
+        .fp-quick-item .emoji { font-size: 14px; }
+
+        .fp-user { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 10px; }
+        .fp-user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 600; }
+        .fp-user-name { font-size: 12px; font-weight: 500; color: white; }
+        .fp-user-role { font-size: 11px; color: var(--sidebar-text); opacity: 0.7; }
+
+        /* ================================================================
+           Header
+           ================================================================ */
+        .fp-header { height: 60px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 16px; flex-shrink: 0; }
+        .fp-search { flex: 1; max-width: 480px; position: relative; }
+        .fp-search input { width: 100%; padding: 9px 12px 9px 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-muted); font-size: 13px; outline: none; color: var(--text-primary); font-family: inherit; }
+        .fp-search input::placeholder { color: var(--text-quaternary); }
+        .fp-search .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-quaternary); }
+        .fp-header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+        .fp-header-btn { width: 36px; height: 36px; border-radius: 8px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); position: relative; }
+        .fp-header-btn:hover { background: var(--surface-muted); }
+        .fp-header-btn svg { width: 18px; height: 18px; }
+        .fp-notif-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: var(--danger); border-radius: 50%; border: 2px solid white; }
+
+        /* V3: Agent Toggle in header */
+        .fp-agent-toggle { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface-muted); cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-secondary); transition: all var(--transition); }
+        .fp-agent-toggle:hover { border-color: var(--accent); }
+        .fp-agent-toggle.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: white; border-color: transparent; box-shadow: 0 0 20px var(--accent-glow); }
+        .fp-agent-toggle .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-quaternary); }
+        .fp-agent-toggle.active .dot { background: white; animation: pulse-dot 1.5s infinite; }
+        @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .fp-header-user { display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; border-radius: 8px; cursor: pointer; border: none; background: transparent; font-family: inherit; }
+        .fp-header-user:hover { background: var(--surface-muted); }
+        .fp-header-user .fp-user-avatar { width: 28px; height: 28px; font-size: 11px; }
+        .fp-header-user-name { font-size: 12px; font-weight: 500; }
+        .fp-header-user-role { font-size: 11px; color: var(--text-tertiary); }
+
+        /* ================================================================
+           Pages
+           ================================================================ */
+        .fp-page { display: none; }
+        .fp-page.active { display: block; }
+        .fp-page-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+        .fp-page-subtitle { font-size: 14px; color: var(--text-tertiary); margin-bottom: 24px; }
+
+        /* ================================================================
+           Components
+           ================================================================ */
+        .fp-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+        .fp-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .fp-panel-title { font-size: 15px; font-weight: 600; }
+        .fp-panel-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+
+        .fp-btn { padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-primary); transition: all var(--transition); font-family: inherit; }
+        .fp-btn:hover { background: var(--surface-muted); }
+        .fp-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+        .fp-btn.primary:hover { background: #4f46e5; }
+        .fp-btn.danger { color: var(--danger); border-color: var(--danger); }
+        .fp-btn.danger:hover { background: rgba(239,68,68,0.05); }
+        .fp-btn.sm { padding: 5px 10px; font-size: 12px; }
+
+        .fp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .fp-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .fp-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        @media (max-width: 900px) { .fp-grid-2, .fp-grid-3, .fp-grid-4 { grid-template-columns: 1fr; } }
+
+        /* Stat cards */
+        .fp-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+        .fp-stat-label { font-size: 12px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .fp-stat-value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+        .fp-stat-delta { font-size: 12px; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+        .fp-stat-delta.up { color: var(--success); }
+        .fp-stat-delta.down { color: var(--danger); }
+        .fp-stat-delta.neutral { color: var(--text-tertiary); }
+
+        /* Health rows */
+        .fp-health-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .fp-health-row:last-child { border-bottom: none; }
+        .fp-integ-status { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+        .fp-integ-status.online { color: var(--success); }
+        .fp-integ-status.warning { color: var(--warning); }
+        .fp-integ-status.offline { color: var(--danger); }
+
+        /* Tags */
+        .fp-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; background: var(--surface-strong); color: var(--text-secondary); }
+        .fp-tag.accent { background: var(--accent-light); color: var(--accent); }
+        .fp-tag.success { background: rgba(34,197,94,0.1); color: var(--success); }
+        .fp-tag.warning { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .fp-tag.danger { background: rgba(239,68,68,0.1); color: var(--danger); }
+        .fp-tag.info { background: rgba(14,165,233,0.1); color: var(--info); }
+
+        /* ================================================================
+           V3: Case Context Live View
+           ================================================================ */
+        .fp-ctx-bar { display: flex; gap: 12px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); align-items: center; flex-shrink: 0; }
+        .fp-ctx-chip { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: var(--surface-muted); border: 1px solid var(--border); }
+        .fp-ctx-chip.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+        .fp-ctx-chip .count { font-weight: 700; font-size: 13px; }
+        .fp-ctx-spacer { flex: 1; }
+        .fp-ctx-sync { font-size: 11px; color: var(--text-tertiary); display: flex; align-items: center; gap: 4px; }
+        .fp-ctx-sync .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+        /* ================================================================
+           V3: Agent Frame (enhanced from V2)
+           ================================================================ */
+        .fp-agent-frame { position: fixed; right: 0; top: 60px; bottom: 0; width: 420px; background: var(--surface); border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); transform: translateX(100%); transition: transform 0.3s ease; z-index: 100; display: flex; flex-direction: column; }
+        .fp-agent-frame.active { transform: translateX(0); }
+        .fp-agent-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+        .fp-agent-header-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+        .fp-agent-status { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .fp-agent-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse-dot 1.5s infinite; }
+        .fp-agent-header-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .fp-agent-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; cursor: pointer; font-family: inherit; color: var(--text-secondary); transition: all var(--transition); }
+        .fp-agent-btn:hover { background: var(--surface-muted); }
+        .fp-agent-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+        .fp-agent-btn.primary:hover { background: #4f46e5; }
+        .fp-agent-btn.danger { color: var(--danger); border-color: var(--danger); }
+        .fp-agent-btn.danger:hover { background: rgba(239,68,68,0.05); }
+
+        .fp-agent-body { flex: 1; overflow-y: auto; padding: 20px; }
+
+        .fp-agent-progress { margin-bottom: 20px; }
+        .fp-agent-progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .fp-agent-progress-title { font-size: 14px; font-weight: 600; }
+        .fp-agent-progress-sub { font-size: 12px; color: var(--text-tertiary); }
+        .fp-agent-progress-bar { height: 6px; background: var(--surface-strong); border-radius: 3px; overflow: hidden; }
+        .fp-agent-progress-bar .fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 3px; transition: width 0.5s ease; }
+        .fp-agent-progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary); margin-top: 6px; }
+
+        .fp-agent-transcript { margin-bottom: 20px; max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-muted); }
+        .fp-agent-transcript-header { font-size: 12px; font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; }
+        .fp-transcript-line { display: flex; align-items: flex-start; gap: 8px; padding: 8px 14px; font-size: 12px; border-bottom: 1px solid var(--border); }
+        .fp-transcript-line:last-child { border-bottom: none; }
+        .fp-transcript-line .time { font-size: 10px; color: var(--text-quaternary); font-family: monospace; white-space: nowrap; min-width: 55px; }
+        .fp-transcript-line .icon { font-size: 12px; flex-shrink: 0; }
+        .fp-transcript-line .text { flex: 1; }
+        .fp-transcript-line .text .highlight { color: var(--accent); font-weight: 500; }
+        .fp-transcript-line.done .icon { color: var(--success); }
+        .fp-transcript-line.pending .icon { color: var(--warning); animation: pulse-dot 1.5s infinite; }
+        .fp-transcript-line.error .icon { color: var(--danger); }
+        .fp-transcript-line .agent-label { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: var(--accent-light); color: var(--accent); margin-left: 4px; }
+
+        .fp-agent-insights { margin-bottom: 20px; }
+        .fp-agent-insights-header { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+        .fp-agent-insight { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-muted); margin-bottom: 6px; }
+        .fp-agent-insight .label { font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .fp-agent-insight .value { font-size: 13px; flex: 1; }
+        .fp-agent-insight .badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; background: var(--surface-strong); margin-left: 4px; }
+        .fp-agent-insight .badge.success { background: rgba(34,197,94,0.1); color: var(--success); }
+        .fp-agent-insight .badge.danger { background: rgba(239,68,68,0.1); color: var(--danger); }
+        .fp-agent-insight .badge.warning { background: rgba(245,158,11,0.1); color: var(--warning); }
+
+        .fp-agent-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 16px; border-top: 1px solid var(--border); }
+
+        /* Cloudflare status chip */
+        .fp-cf-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-tertiary); padding: 2px 10px; border-radius: 20px; background: rgba(243,243,0,0.08); border: 1px solid rgba(243,243,0,0.15); }
+        .fp-cf-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+        /* ================================================================
+           V3: Audit Ledger
+           ================================================================ */
+        .fp-ledger-entry { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .fp-ledger-entry:last-child { border-bottom: none; }
+        .fp-ledger-hash { font-family: monospace; font-size: 11px; color: var(--text-tertiary); background: var(--surface-muted); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); }
+        .fp-ledger-entry .fp-ledger-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .fp-ledger-entry .fp-ledger-icon.agent { background: var(--accent-light); }
+        .fp-ledger-entry .fp-ledger-icon.human { background: rgba(34,197,94,0.1); }
+        .fp-ledger-entry .fp-ledger-content { flex: 1; }
+        .fp-ledger-entry .fp-ledger-title { font-size: 13px; font-weight: 500; }
+        .fp-ledger-entry .fp-ledger-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+        /* ================================================================
+           V3: Discrepancy Matrix
+           ================================================================ */
+        .fp-disc-cell { padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+        .fp-disc-cell .source { font-size: 11px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; }
+        .fp-disc-cell .claim { font-size: 13px; margin-top: 4px; }
+        .fp-disc-cell .meta { font-size: 11px; color: var(--text-quaternary); margin-top: 4px; }
+        .fp-disc-arrow { display: flex; align-items: center; justify-content: center; color: var(--text-quaternary); font-size: 18px; }
+        .fp-disc-conflict { border-color: var(--danger); background: rgba(239,68,68,0.03); }
+        .fp-disc-match { border-color: var(--success); background: rgba(34,197,94,0.03); }
+
+        /* ================================================================
+           V3: Deadline Engine
+           ================================================================ */
+        .fp-deadline-track { position: relative; padding: 20px 0; }
+        .fp-deadline-line { height: 3px; background: var(--border); border-radius: 2px; position: relative; margin: 0 20px; }
+        .fp-deadline-segment { position: absolute; height: 100%; border-radius: 2px; }
+        .fp-deadline-segment.ok { background: var(--success); }
+        .fp-deadline-segment.warn { background: var(--warning); }
+        .fp-deadline-segment.over { background: var(--danger); }
+        .fp-deadline-marker { position: absolute; top: -6px; width: 14px; height: 14px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--border); transform: translateX(-50%); }
+        .fp-deadline-marker.actual { background: var(--accent); }
+        .fp-deadline-marker.required { background: var(--text-tertiary); }
+        .fp-deadline-marker.overdue { background: var(--danger); }
+        .fp-deadline-label { position: absolute; top: 14px; font-size: 10px; color: var(--text-tertiary); white-space: nowrap; transform: translateX(-50%); }
+
+        /* ================================================================
+           V3: Evidence Chain
+           ================================================================ */
+        .fp-chain-step { display: flex; align-items: flex-start; gap: 12px; position: relative; padding-bottom: 20px; }
+        .fp-chain-step::before { content: ''; position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: var(--border); }
+        .fp-chain-step:last-child::before { display: none; }
+        .fp-chain-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; z-index: 1; }
+        .fp-chain-dot.intake { background: var(--accent-light); }
+        .fp-chain-dot.verify { background: rgba(34,197,94,0.1); }
+        .fp-chain-dot.hash { background: rgba(245,158,11,0.1); }
+        .fp-chain-dot.ledger { background: rgba(14,165,233,0.1); }
+        .fp-chain-content { flex: 1; padding-top: 4px; }
+        .fp-chain-title { font-size: 13px; font-weight: 500; }
+        .fp-chain-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+        .fp-chain-hash { font-family: monospace; font-size: 10px; color: var(--text-quaternary); margin-top: 4px; }
+
+        /* ================================================================
+           V3: Agent Network Graph
+           ================================================================ */
+        .fp-agent-graph { position: relative; min-height: 320px; background: var(--surface-muted); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; overflow: hidden; }
+        .fp-graph-node { position: absolute; padding: 10px 16px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-md); z-index: 2; }
+        .fp-graph-node.orchestrator { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: white; top: 20px; left: 50%; transform: translateX(-50%); }
+        .fp-graph-node.specialist { background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); }
+        .fp-graph-node.active { border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
+        .fp-graph-node .dot { width: 6px; height: 6px; border-radius: 50%; }
+        .fp-graph-node .dot.active { background: var(--success); animation: pulse-dot 1.5s infinite; }
+        .fp-graph-node .dot.idle { background: var(--text-quaternary); }
+        .fp-graph-edge { position: absolute; height: 2px; background: var(--border); z-index: 1; transform-origin: left center; }
+
+        /* ================================================================
+           V3: Neutrality Guardrails
+           ================================================================ */
+        .fp-guardrail-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 8px; }
+        .fp-guardrail-item.blocked { border-color: var(--danger); background: rgba(239,68,68,0.02); }
+        .fp-guardrail-item.warn { border-color: var(--warning); background: rgba(245,158,11,0.02); }
+        .fp-guardrail-icon { font-size: 16px; flex-shrink: 0; }
+        .fp-guardrail-content { flex: 1; }
+        .fp-guardrail-label { font-size: 12px; font-weight: 600; }
+        .fp-guardrail-detail { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+        .fp-guardrail-code { font-family: monospace; font-size: 11px; background: var(--surface-muted); padding: 4px 8px; border-radius: 4px; margin-top: 4px; display: inline-block; }
+
+        /* ================================================================
+           V3: Statute Library
+           ================================================================ */
+        .fp-statute-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all var(--transition); }
+        .fp-statute-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+        .fp-statute-ref { font-size: 13px; font-weight: 600; color: var(--accent); }
+        .fp-statute-title { font-size: 14px; margin-top: 4px; }
+        .fp-statute-desc { font-size: 12px; color: var(--text-tertiary); margin-top: 6px; }
+        .fp-statute-window { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+        .fp-statute-window-bar { flex: 1; height: 4px; background: var(--surface-strong); border-radius: 2px; position: relative; }
+        .fp-statute-window-fill { position: absolute; height: 100%; border-radius: 2px; }
+        .fp-statute-window-label { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
+
+        /* ================================================================
+           V3: Public Records Watch Feed
+           ================================================================ */
+        .fp-watch-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .fp-watch-item:last-child { border-bottom: none; }
+        .fp-watch-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+        .fp-watch-dot.new { background: var(--danger); animation: pulse-dot 1.5s infinite; }
+        .fp-watch-dot.recent { background: var(--warning); }
+        .fp-watch-dot.old { background: var(--text-quaternary); }
+        .fp-watch-content { flex: 1; }
+        .fp-watch-title { font-size: 13px; font-weight: 500; }
+        .fp-watch-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+        .fp-watch-impact { font-size: 11px; font-weight: 600; margin-top: 4px; }
+
+        /* ================================================================
+           V3: Procedural Graph Builder
+           ================================================================ */
+        .fp-proc-stage { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 8px; cursor: pointer; transition: all var(--transition); }
+        .fp-proc-stage:hover { border-color: var(--accent); }
+        .fp-proc-stage-num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-light); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+        .fp-proc-stage-content { flex: 1; }
+        .fp-proc-stage-name { font-size: 13px; font-weight: 500; }
+        .fp-proc-stage-rule { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+        .fp-proc-stage-deadline { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: var(--surface-muted); white-space: nowrap; }
+
+        /* ================================================================
+           Tables
+           ================================================================ */
+        .fp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .fp-table th { text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-tertiary); font-weight: 600; border-bottom: 1px solid var(--border); }
+        .fp-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        .fp-table tr:hover td { background: var(--surface-muted); }
+        .fp-table .mono { font-family: monospace; font-size: 12px; }
+
+        /* ================================================================
+           Chat (Assistant page)
+           ================================================================ */
+        .fp-chat-area { max-height: 500px; overflow-y: auto; padding: 8px 0; }
+        .fp-chat-msg { display: flex; gap: 12px; margin-bottom: 16px; }
+        .fp-chat-msg.user { justify-content: flex-end; }
+        .fp-chat-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+        .fp-chat-avatar.ai { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; }
+        .fp-chat-bubble { padding: 10px 14px; border-radius: 12px; max-width: 80%; font-size: 13px; }
+        .fp-chat-bubble.user { background: var(--text-primary); color: white; border-radius: 12px 12px 4px 12px; }
+        .fp-chat-bubble.ai { background: var(--surface-muted); border-radius: 12px 12px 12px 4px; }
+        .fp-chat-bubble .agents-tag { font-size: 11px; color: var(--accent); margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+        .fp-chat-input { display: flex; gap: 8px; margin-top: 16px; }
+        .fp-chat-input input { flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; font-family: inherit; outline: none; }
+        .fp-chat-input input:focus { border-color: var(--accent); }
+
+        /* ================================================================
+           Policy Studio (ported from V1)
+           ================================================================ */
+        .fp-ps-layout { display: grid; grid-template-columns: 280px 1fr 300px; gap: 16px; height: calc(100vh - 140px); }
+        @media (max-width: 1200px) { .fp-ps-layout { grid-template-columns: 1fr; height: auto; } }
+        .fp-ps-sidebar { overflow-y: auto; }
+        .fp-ps-rule-item { padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 4px; transition: all var(--transition); border: 1px solid transparent; }
+        .fp-ps-rule-item:hover { background: var(--surface-muted); }
+        .fp-ps-rule-item.active { background: var(--accent-light); border-color: var(--accent); }
+        .fp-ps-rule-name { font-size: 13px; font-weight: 500; }
+        .fp-ps-rule-ref { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+        .fp-ps-editor { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; overflow-y: auto; }
+        .fp-ps-field { margin-bottom: 20px; }
+        .fp-ps-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .fp-ps-input { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: 13px; font-family: inherit; outline: none; }
+        .fp-ps-input:focus { border-color: var(--accent); }
+        .fp-ps-textarea { min-height: 80px; resize: vertical; }
+        .fp-ps-select { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: 13px; font-family: inherit; background: var(--surface); }
+        .fp-ps-impact-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; overflow-y: auto; }
+        .fp-ps-impact-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .fp-ps-impact-case { padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 8px; cursor: pointer; transition: all var(--transition); }
+        .fp-ps-impact-case:hover { border-color: var(--accent); }
+        .fp-ps-impact-case-id { font-size: 12px; font-weight: 600; }
+        .fp-ps-impact-case-desc { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+        .fp-ps-impact-case-status { font-size: 11px; font-weight: 600; margin-top: 4px; }
+        .fp-ps-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; margin-right: 4px; margin-bottom: 4px; }
+        .fp-ps-tag.accent { background: var(--accent-light); color: var(--accent); }
+
+        /* ================================================================
+           Timeline (ported from V1)
+           ================================================================ */
+        .fp-tl-track { position: relative; padding-left: 24px; }
+        .fp-tl-track::before { content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+        .fp-tl-event { position: relative; padding: 0 0 24px 24px; }
+        .fp-tl-event::before { content: ''; position: absolute; left: -20px; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--border); }
+        .fp-tl-event.ok::before { background: var(--success); }
+        .fp-tl-event.warn::before { background: var(--warning); }
+        .fp-tl-event.danger::before { background: var(--danger); }
+        .fp-tl-event.info::before { background: var(--info); }
+        .fp-tl-event-date { font-size: 11px; color: var(--text-tertiary); font-family: monospace; }
+        .fp-tl-event-title { font-size: 13px; font-weight: 500; margin-top: 2px; }
+        .fp-tl-event-desc { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+        .fp-tl-event-tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+        .fp-tl-gap { padding: 8px 12px; margin: 8px 0 16px 12px; border-radius: var(--radius-sm); border: 1px dashed var(--warning); background: rgba(245,158,11,0.04); }
+        .fp-tl-gap-title { font-size: 12px; font-weight: 600; color: var(--warning); }
+        .fp-tl-gap-desc { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+        /* ================================================================
+           Evidence (ported from V1)
+           ================================================================ */
+        .fp-ev-item { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 12px; background: var(--surface); transition: all var(--transition); }
+        .fp-ev-item:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+        .fp-ev-icon { width: 40px; height: 40px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; background: var(--surface-muted); }
+        .fp-ev-content { flex: 1; }
+        .fp-ev-name { font-size: 14px; font-weight: 600; }
+        .fp-ev-meta { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .fp-ev-hash { font-family: monospace; font-size: 11px; color: var(--text-quaternary); }
+        .fp-ev-actions { display: flex; gap: 6px; margin-top: 8px; }
+
+        /* ================================================================
+           Reports (ported from V1)
+           ================================================================ */
+        .fp-reports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+        .fp-report-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; cursor: pointer; transition: all var(--transition); }
+        .fp-report-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+        .fp-report-icon { font-size: 28px; margin-bottom: 12px; }
+        .fp-report-title { font-size: 15px; font-weight: 600; }
+        .fp-report-desc { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+        .fp-report-meta { font-size: 11px; color: var(--text-quaternary); margin-top: 10px; }
+
+        /* ================================================================
+           Analytics
+           ================================================================ */
+        .fp-analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .fp-chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+        .fp-chart-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+        /* ================================================================
+           Mobile
+           ================================================================ */
+        @media (max-width: 768px) {
+            .fp-sidebar { display: none; }
+            .fp-agent-frame { width: 100%; }
+            .fp-ps-layout { grid-template-columns: 1fr; }
+            .fp-grid-2, .fp-grid-3, .fp-grid-4 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="fp-app">
+        <!-- ===== Sidebar ===== -->
+        <aside class="fp-sidebar">
+            <div class="fp-logo">
+                <div class="fp-logo-shield">FP</div>
+                <div>
+                    <div class="fp-logo-text">FairProcess</div>
+                    <div class="fp-logo-sub">Jurisdiction Intelligence</div>
+                </div>
+            </div>
+
+            <div class="fp-workspace">
+                <button class="fp-workspace-btn">
+                    <span>🏛️</span> Humboldt County
+                </button>
+                <div class="fp-workspace-label">Active Jurisdiction</div>
+            </div>
+
+            <nav class="fp-nav">
+                <div class="fp-nav-label">Intelligence</div>
+                <button class="fp-nav-item active" data-page="assistant">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    Assistant
+                </button>
+                <button class="fp-nav-item" data-page="agent-mode">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Agent Mode
+                    <span class="fp-nav-badge agent">Off</span>
+                </button>
+                <button class="fp-nav-item" data-page="agents">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Active Agents
+                </button>
+                <button class="fp-nav-item" data-page="agent-network">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    Agent Network
+                </button>
+
+                <div class="fp-nav-label">Cases & Evidence</div>
+                <button class="fp-nav-item" data-page="cases">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                    Cases
+                    <span class="fp-nav-badge">7</span>
+                </button>
+                <button class="fp-nav-item" data-page="evidence">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Evidence
+                </button>
+                <button class="fp-nav-item" data-page="evidence-chain">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    Evidence Chain
+                </button>
+                <button class="fp-nav-item" data-page="timeline">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    Timeline
+                </button>
+                <button class="fp-nav-item" data-page="discrepancies">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Discrepancies
+                    <span class="fp-nav-badge warning">3</span>
+                </button>
+                <button class="fp-nav-item" data-page="documents">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Documents
+                </button>
+
+                <div class="fp-nav-label">Compliance</div>
+                <button class="fp-nav-item" data-page="deadline-engine">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    Deadline Engine
+                </button>
+                <button class="fp-nav-item" data-page="rules">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                    Statute Library
+                </button>
+                <button class="fp-nav-item" data-page="policy-studio">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    Policy Studio
+                </button>
+                <button class="fp-nav-item" data-page="guardrails">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Neutrality Guardrails
+                </button>
+                <button class="fp-nav-item" data-page="proc-builder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                    Procedural Graphs
+                </button>
+
+                <div class="fp-nav-label">System</div>
+                <button class="fp-nav-item" data-page="ledger">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Audit Ledger
+                </button>
+                <button class="fp-nav-item" data-page="knowledge-graph">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    Knowledge Graph
+                </button>
+                <button class="fp-nav-item" data-page="records-watch">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    Records Watch
+                    <span class="fp-nav-badge danger">5</span>
+                </button>
+                <button class="fp-nav-item" data-page="control-panel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Control Panel
+                </button>
+                <button class="fp-nav-item" data-page="analytics">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    Analytics
+                </button>
+                <button class="fp-nav-item" data-page="agent-training">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    Agent Training
+                </button>
+            </nav>
+
+            <div class="fp-quick">
+                <button class="fp-quick-item"><span class="emoji">⚡</span> Quick Action</button>
+                <button class="fp-quick-item"><span class="emoji">📋</span> New Case</button>
+                <button class="fp-quick-item"><span class="emoji">📤</span> Upload Document</button>
+            </div>
+
+            <div class="fp-user">
+                <div class="fp-user-avatar">JM</div>
+                <div>
+                    <div class="fp-user-name">Jim</div>
+                    <div class="fp-user-role">Administrator</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ===== Main ===== -->
+        <main class="fp-main">
+            <header class="fp-header">
+                <div class="fp-search">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <input type="text" id="globalSearch" placeholder="Ask anything about your jurisdiction..." />
+                </div>
+                <div class="fp-header-actions">
+                    <button class="fp-agent-toggle" id="agentToggle">
+                        <span class="dot"></span>
+                        Agent Mode
+                    </button>
+                    <button class="fp-header-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        <span class="fp-notif-dot"></span>
+                    </button>
+                    <button class="fp-header-user">
+                        <div class="fp-user-avatar">JM</div>
+                        <div>
+                            <div class="fp-header-user-name">Jim</div>
+                            <div class="fp-header-user-role">Admin</div>
+                        </div>
+                    </button>
+                </div>
+            </header>
+
+            <!-- V3: Case Context Bar -->
+            <div class="fp-ctx-bar">
+                <div class="fp-ctx-chip active">📁 Case CE26-0402</div>
+                <div class="fp-ctx-chip"><span class="count">14</span> Verified Facts</div>
+                <div class="fp-ctx-chip"><span class="count" style="color:var(--warning)">3</span> Discrepancies</div>
+                <div class="fp-ctx-chip"><span class="count">5</span> Active Statutes</div>
+                <div class="fp-ctx-chip"><span class="count">8</span> Evidence Items</div>
+                <div class="fp-ctx-spacer"></div>
+                <div class="fp-ctx-sync"><span class="dot"></span> Context synced 2m ago</div>
+            </div>
+
+            <div class="fp-content" id="mainContent">
+
+                <!-- ============================================================
+                PAGE: ASSISTANT (V2 shell)
+                ============================================================ -->
+                <div class="fp-page active" id="page-assistant">
+                    <h1 class="fp-page-title">Assistant</h1>
+                    <p class="fp-page-subtitle">Ask anything about your jurisdiction. The orchestrator routes to the right experts automatically.</p>
+                    <div class="fp-panel">
+                        <div class="fp-chat-area" id="chatArea">
+                            <div class="fp-chat-msg">
+                                <div class="fp-chat-avatar ai">FP</div>
+                                <div class="fp-chat-bubble ai">
+                                    I'm your FairProcess assistant. I can analyze evidence, check deadlines against statutes, flag discrepancies, and coordinate across specialist agents. What do you need?
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fp-chat-input">
+                            <input type="text" id="chatInput" placeholder="Ask about a case, statute, deadline, or evidence..." />
+                            <button class="fp-btn primary" onclick="sendChatMessage()">Send</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: AGENT MODE (V2 shell)
+                ============================================================ -->
+                <div class="fp-page" id="page-agent-mode">
+                    <h1 class="fp-page-title">Agent Mode</h1>
+                    <p class="fp-page-subtitle">Watch the orchestrator coordinate specialist agents in real-time. Pause, step, or take over at any time.</p>
+                    <div class="fp-grid-3">
+                        <div class="fp-stat">
+                            <div class="fp-stat-label">Active Agents</div>
+                            <div class="fp-stat-value">3</div>
+                            <div class="fp-stat-delta neutral">Planning · Building · Environmental</div>
+                        </div>
+                        <div class="fp-stat">
+                            <div class="fp-stat-label">Steps Complete</div>
+                            <div class="fp-stat-value">7/11</div>
+                            <div class="fp-stat-delta up">64% complete</div>
+                        </div>
+                        <div class="fp-stat">
+                            <div class="fp-stat-label">Est. Completion</div>
+                            <div class="fp-stat-value">4m</div>
+                            <div class="fp-stat-delta neutral">23s remaining</div>
+                        </div>
+                    </div>
+                    <div class="fp-panel" style="margin-top:16px;">
+                        <div class="fp-panel-header">
+                            <div class="fp-panel-title">Live Workflow</div>
+                            <button class="fp-btn primary" onclick="toggleAgentMode()">▶ Start Agent Workflow</button>
+                        </div>
+                        <p style="font-size:13px;color:var(--text-tertiary);">Open the agent panel using the toggle in the header to see the live transcript, insights, and controls.</p>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: ACTIVE AGENTS (V2 shell)
+                ============================================================ -->
+                <div class="fp-page" id="page-agents">
+                    <h1 class="fp-page-title">Active Agents</h1>
+                    <p class="fp-page-subtitle">Current expert network assembled by the orchestrator.</p>
+                    <div class="fp-grid-3">
+                        <div class="fp-panel">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                                <div style="width:36px;height:36px;border-radius:8px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;font-size:18px;">🏗️</div>
+                                <div><div style="font-weight:600;">Planning Agent</div><div style="font-size:11px;color:var(--text-tertiary);">@cf/meta/llama-3-8b-instruct</div></div>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px;">Zoning, permits, land use</div>
+                            <div style="font-size:12px;color:var(--success);margin-bottom:8px;">● Active · 1,247 queries · 96% accuracy</div>
+                            <div style="font-size:11px;color:var(--text-tertiary);">Guardrail: "You identify evidentiary status. You do not render legal conclusions."</div>
+                        </div>
+                        <div class="fp-panel">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                                <div style="width:36px;height:36px;border-radius:8px;background:rgba(34,197,94,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">🏗️</div>
+                                <div><div style="font-weight:600;">Building Agent</div><div style="font-size:11px;color:var(--text-tertiary);">@cf/meta/llama-3-8b-instruct</div></div>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px;">Codes, inspections, construction</div>
+                            <div style="font-size:12px;color:var(--success);margin-bottom:8px;">● Active · 892 queries · 94% accuracy</div>
+                            <div style="font-size:11px;color:var(--text-tertiary);">Guardrail: "You identify evidentiary status. You do not render legal conclusions."</div>
+                        </div>
+                        <div class="fp-panel">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                                <div style="width:36px;height:36px;border-radius:8px;background:rgba(34,197,94,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">🌿</div>
+                                <div><div style="font-weight:600;">Environmental Agent</div><div style="font-size:11px;color:var(--text-tertiary);">@cf/meta/llama-3-8b-instruct</div></div>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px;">Health, hazmat, water quality</div>
+                            <div style="font-size:12px;color:var(--success);margin-bottom:8px;">● Active · 456 queries · 91% accuracy</div>
+                            <div style="font-size:11px;color:var(--text-tertiary);">Guardrail: "You identify evidentiary status. You do not render legal conclusions."</div>
+                        </div>
+                        <div class="fp-panel">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                                <div style="width:36px;height:36px;border-radius:8px;background:rgba(245,158,11,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">🔥</div>
+                                <div><div style="font-weight:600;">Fire Department Agent</div><div style="font-size:11px;color:var(--text-tertiary);">@cf/meta/llama-3-8b-instruct</div></div>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px;">Fire safety, defensible space</div>
+                            <div style="font-size:12px;color:var(--warning);margin-bottom:8px;">● Idle · 203 queries · 89% accuracy</div>
+                            <div style="font-size:11px;color:var(--text-tertiary);">Guardrail: "You identify evidentiary status. You do not render legal conclusions."</div>
+                        </div>
+                        <div class="fp-panel">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                                <div style="width:36px;height:36px;border-radius:8px;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;font-size:18px;">🔍</div>
+                                <div><div style="font-weight:600;">Discrepancy Agent</div><div style="font-size:11px;color:var(--text-tertiary);">@cf/meta/llama-3-8b-instruct</div></div>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px;">Conflict detection, source citation</div>
+                            <div style="font-size:12px;color:var(--danger);margin-bottom:8px;">● Flagged 3 discrepancies</div>
+                            <div style="font-size:11px;color:var(--text-tertiary);">Guardrail: "You characterize conflicts. You do not resolve which source is correct."</div>
+                        </div>
+                        <div class="fp-panel">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                                <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-size:18px;">🧠</div>
+                                <div><div style="font-weight:600;">Orchestrator</div><div style="font-size:11px;color:var(--text-tertiary);">@cf/meta/llama-3-8b-instruct</div></div>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px;">Routes requests, coordinates agents</div>
+                            <div style="font-size:12px;color:var(--accent);margin-bottom:8px;">● Active · Tier 1 (deterministic) + Tier 2 (LLM planning)</div>
+                            <div style="font-size:11px;color:var(--text-tertiary);">Two-tier routing: rules first, LLM fallback for novel queries</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: AGENT NETWORK (V3 NEW)
+                ============================================================ -->
+                <div class="fp-page" id="page-agent-network">
+                    <h1 class="fp-page-title">Agent Network</h1>
+                    <p class="fp-page-subtitle">Visual map of the orchestrator's routing topology and active data flows.</p>
+                    <div class="fp-agent-graph" id="agentGraph">
+                        <!-- Orchestrator at top -->
+                        <div class="fp-graph-node orchestrator" style="top:10px;left:50%;transform:translateX(-50%);">
+                            🧠 Orchestrator
+                            <span class="dot active"></span>
+                        </div>
+                        <!-- Specialists in a row -->
+                        <div class="fp-graph-node specialist active" style="top:100px;left:8%;">
+                            🏗️ Planning
+                            <span class="dot active"></span>
+                        </div>
+                        <div class="fp-graph-node specialist active" style="top:100px;left:33%;">
+                             Building
+                            <span class="dot active"></span>
+                        </div>
+                        <div class="fp-graph-node specialist active" style="top:100px;left:58%;">
+                            🌿 Environmental
+                            <span class="dot active"></span>
+                        </div>
+                        <div class="fp-graph-node specialist" style="top:100px;left:80%;">
+                            🔥 Fire
+                            <span class="dot idle"></span>
+                        </div>
+                        <!-- Second tier -->
+                        <div class="fp-graph-node specialist active" style="top:200px;left:20%;">
+                            🔍 Discrepancy
+                            <span class="dot active"></span>
+                        </div>
+                        <div class="fp-graph-node specialist active" style="top:200px;left:45%;">
+                            📅 Timeline
+                            <span class="dot active"></span>
+                        </div>
+                        <div class="fp-graph-node specialist active" style="top:200px;left:70%;">
+                            ⚖️ Statute Matching
+                            <span class="dot active"></span>
+                        </div>
+                        <!-- Third tier -->
+                        <div class="fp-graph-node specialist" style="top:280px;left:35%;">
+                            📄 Document
+                            <span class="dot idle"></span>
+                        </div>
+                        <div class="fp-graph-node specialist" style="top:280px;left:60%;">
+                            🔎 Fact Extraction
+                            <span class="dot idle"></span>
+                        </div>
+                        <!-- SVG edges -->
+                        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;" id="graphSvg">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                                    <polygon points="0 0, 6 3, 0 6" fill="var(--text-quaternary)" />
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
+                    <div class="fp-panel" style="margin-top:16px;">
+                        <div class="fp-panel-title">Routing Rules (Tier 1 — Deterministic)</div>
+                        <div style="margin-top:12px;">
+                            <div class="fp-health-row"><span>📄 Document uploaded</span><span class="fp-tag accent">fact_extraction → timeline</span></div>
+                            <div class="fp-health-row"><span>📝 Policy rule edited</span><span class="fp-tag accent">statute_matching (impact preview)</span></div>
+                            <div class="fp-health-row"><span>💬 "compliant" / "deadline" / "on time"</span><span class="fp-tag accent">timeline + statute_matching</span></div>
+                            <div class="fp-health-row"><span>⚠️ New fact conflicts with verified fact</span><span class="fp-tag accent">discrepancy_agent</span></div>
+                            <div class="fp-health-row"><span>🤔 No Tier 1 match</span><span class="fp-tag warning">Tier 2: LLM planning call</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: CASES (V1 depth)
+                ============================================================ -->
+                <div class="fp-page" id="page-cases">
+                    <h1 class="fp-page-title">Cases</h1>
+                    <p class="fp-page-subtitle">Manage all active and archived cases.</p>
+                    <div class="fp-panel">
+                        <table class="fp-table">
+                            <thead>
+                                <tr><th>Case ID</th><th>Title</th><th>Jurisdiction</th><th>Status</th><th>Opened</th><th>Last Agent</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td class="mono">CE26-0402</td><td>Citation Mailing Compliance</td><td>Humboldt County</td><td><span class="fp-tag warning">Active Discrepancy</span></td><td>Jul 15, 2026</td><td>statute_matching</td></tr>
+                                <tr><td class="mono">CE26-0398</td><td>ADU Permit Review</td><td>Humboldt County</td><td><span class="fp-tag success">On Track</span></td><td>Jul 10, 2026</td><td>timeline</td></tr>
+                                <tr><td class="mono">CE26-0387</td><td>Notice Publication Timeline</td><td>Humboldt County</td><td><span class="fp-tag danger">Deadline Overrun</span></td><td>Jul 02, 2026</td><td>discrepancy</td></tr>
+                                <tr><td class="mono">CE26-0371</td><td>Environmental Review Checklist</td><td>Humboldt County</td><td><span class="fp-tag success">On Track</span></td><td>Jun 28, 2026</td><td>environmental</td></tr>
+                                <tr><td class="mono">CE26-0354</td><td>Subdivision Map Act Compliance</td><td>Humboldt County</td><td><span class="fp-tag info">Under Review</span></td><td>Jun 20, 2026</td><td>fact_extraction</td></tr>
+                                <tr><td class="mono">CE26-0331</td><td>Code Enforcement Notice</td><td>Humboldt County</td><td><span class="fp-tag warning">Needs Evidence</span></td><td>Jun 15, 2026</td><td>document</td></tr>
+                                <tr><td class="mono">CE26-0298</td><td>Appeal Filing Deadline</td><td>Humboldt County</td><td><span class="fp-tag success">Complete</span></td><td>May 28, 2026</td><td>statute_matching</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: EVIDENCE (V1 depth)
+                ============================================================ -->
+                <div class="fp-page" id="page-evidence">
+                    <h1 class="fp-page-title">Evidence</h1>
+                    <p class="fp-page-subtitle">All evidence items with cryptographic verification.</p>
+                    <div class="fp-grid-2">
+                        <div>
+                            <div class="fp-ev-item">
+                                <div class="fp-ev-icon">📄</div>
+                                <div class="fp-ev-content">
+                                    <div class="fp-ev-name">Citation — CE26-0402</div>
+                                    <div class="fp-ev-meta">
+                                        <span>📅 Mailed: Jul 22, 2026</span>
+                                        <span>✅ Verified</span>
+                                        <span class="fp-ev-hash">SHA-256: a3f8b2c1...</span>
+                                    </div>
+                                    <div class="fp-ev-actions">
+                                        <button class="fp-btn sm">View</button>
+                                        <button class="fp-btn sm">Verify Chain</button>
+                                        <button class="fp-btn sm">Ask Agent</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fp-ev-item">
+                                <div class="fp-ev-icon">📮</div>
+                                <div class="fp-ev-content">
+                                    <div class="fp-ev-name">Postmark Certificate</div>
+                                    <div class="fp-ev-meta">
+                                        <span>📅 Jul 24, 2026</span>
+                                        <span class="fp-tag warning">Discrepancy Flagged</span>
+                                        <span class="fp-ev-hash">SHA-256: b7e4d9a2...</span>
+                                    </div>
+                                    <div class="fp-ev-actions">
+                                        <button class="fp-btn sm">View</button>
+                                        <button class="fp-btn sm">Compare Sources</button>
+                                        <button class="fp-btn sm">Ask Agent</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fp-ev-item">
+                                <div class="fp-ev-icon">📋</div>
+                                <div class="fp-ev-content">
+                                    <div class="fp-ev-name">Hearing Notice — CE26-0398</div>
+                                    <div class="fp-ev-meta">
+                                        <span>📅 Published: Jul 18, 2026</span>
+                                        <span class="fp-tag success">Verified</span>
+                                        <span class="fp-ev-hash">SHA-256: c2f1a8b9...</span>
+                                    </div>
+                                    <div class="fp-ev-actions">
+                                        <button class="fp-btn sm">View</button>
+                                        <button class="fp-btn sm">Verify Chain</button>
+                                        <button class="fp-btn sm">Ask Agent</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Agent Analysis</div>
+                            <div style="font-size:13px;margin-top:12px;">
+                                <p style="margin-bottom:8px;">The <strong>discrepancy agent</strong> has flagged a conflict between the citation mailing date (Jul 22) and the postmark (Jul 24) in case CE26-0402.</p>
+                                <p style="margin-size:11px;color:var(--text-tertiary);margin-bottom:12px;">Both sources have been cited. The agent does not resolve which is correct — it characterizes the conflict for human review.</p>
+                                <div class="fp-tag warning" style="display:inline-block;margin-bottom:8px;">2-day gap detected</div>
+                                <div class="fp-tag danger" style="display:inline-block;margin-bottom:8px;">Exceeds 3-business-day window (HCC § 351-7)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: EVIDENCE CHAIN (V3 NEW)
+                ============================================================ -->
+                <div class="fp-page" id="page-evidence-chain">
+                    <h1 class="fp-page-title">Evidence Chain of Custody</h1>
+                    <p class="fp-page-subtitle">Cryptographic chain of custody for every piece of evidence. Each step is hashed and written to the audit ledger.</p>
+                    <div class="fp-grid-2">
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Citation — CE26-0402</div>
+                            <div style="margin-top:16px;">
+                                <div class="fp-chain-step">
+                                    <div class="fp-chain-dot intake">📥</div>
+                                    <div class="fp-chain-content">
+                                        <div class="fp-chain-title">Document Intake</div>
+                                        <div class="fp-chain-meta">Jul 22, 2026 10:23 AM · Jim</div>
+                                        <div class="fp-chain-hash">hash: a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5</div>
+                                    </div>
+                                </div>
+                                <div class="fp-chain-step">
+                                    <div class="fp-chain-dot verify">✅</div>
+                                    <div class="fp-chain-content">
+                                        <div class="fp-chain-title">Fact Extraction Agent</div>
+                                        <div class="fp-chain-meta">Jul 22, 2026 10:24 AM · Automated</div>
+                                        <div class="fp-chain-hash">hash: b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9</div>
+                                    </div>
+                                </div>
+                                <div class="fp-chain-step">
+                                    <div class="fp-chain-dot hash">🔐</div>
+                                    <div class="fp-chain-content">
+                                        <div class="fp-chain-title">Cryptographic Sealing</div>
+                                        <div class="fp-chain-meta">Jul 22, 2026 10:24 AM · SHA-256</div>
+                                        <div class="fp-chain-hash">seal: c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0</div>
+                                    </div>
+                                </div>
+                                <div class="fp-chain-step">
+                                    <div class="fp-chain-dot ledger">📊</div>
+                                    <div class="fp-chain-content">
+                                        <div class="fp-chain-title">Ledger Entry Written</div>
+                                        <div class="fp-chain-meta">Jul 22, 2026 10:24 AM · AgentRun #4821</div>
+                                        <div class="fp-chain-hash">ledger: d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Postmark Certificate</div>
+                            <div style="margin-top:16px;">
+                                <div class="fp-chain-step">
+                                    <div class="fp-chain-dot intake">📥</div>
+                                    <div class="fp-chain-content">
+                                        <div class="fp-chain-title">Document Intake</div>
+                                        <div class="fp-chain-meta">Jul 24, 2026 2:15 PM · Jim</div>
+                                        <div class="fp-chain-hash">hash: e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2</div>
+                                    </div>
+                                </div>
+                                <div class="fp-chain-step">
+                                    <div class="fp-chain-dot verify">✅</div>
+                                    <div class="fp-chain-content">
+                                        <div class="fp-chain-title">Fact Extraction Agent</div>
+                                        <div class="fp-chain-meta">Jul 24, 2026 2:16 PM · Automated</div>
+                                        <div class="fp-chain-hash">hash: f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3</div>
+                                    </div>
+                                </div>
+                                <div class="fp-chain-step">
+                                    <div class="fp-chain-dot verify" style="background:rgba(239,68,68,0.1);">⚠️</div>
+                                    <div class="fp-chain-content">
+                                        <div class="fp-chain-title">Discrepancy Agent — Conflict Detected</div>
+                                        <div class="fp-chain-meta">Jul 24, 2026 2:17 PM · Automated</div>
+                                        <div class="fp-chain-hash">conflict: 2-day gap vs citation date</div>
+                                    </div>
+                                </div>
+                                <div class="fp-chain-step">
+                                    <div class="fp-chain-dot ledger">📊</div>
+                                    <div class="fp-chain-content">
+                                        <div class="fp-chain-title">Ledger Entry Written</div>
+                                        <div class="fp-chain-meta">Jul 24, 2026 2:17 PM · AgentRun #4827</div>
+                                        <div class="fp-chain-hash">ledger: a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: TIMELINE (V1 depth)
+                ============================================================ -->
+                <div class="fp-page" id="page-timeline">
+                    <h1 class="fp-page-title">Timeline Engine</h1>
+                    <p class="fp-page-subtitle">Complete procedural chronology with gap detection. Events are sequenced by the timeline agent from verified facts.</p>
+                    <div class="fp-grid-2">
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Case CE26-0402 — Citation Mailing Compliance</div>
+                            <div class="fp-tl-track" style="margin-top:16px;">
+                                <div class="fp-tl-event ok">
+                                    <div class="fp-tl-event-date">Jul 15, 2026</div>
+                                    <div class="fp-tl-event-title">Citation executed</div>
+                                    <div class="fp-tl-event-desc">Citation issued and signed by clerk</div>
+                                    <div class="fp-tl-event-tags"><span class="fp-tag accent">Source: Citation doc</span><span class="fp-tag success">Verified</span></div>
+                                </div>
+                                <div class="fp-tl-event danger">
+                                    <div class="fp-tl-event-date">Jul 22, 2026</div>
+                                    <div class="fp-tl-event-title">Citation mailed (claimed)</div>
+                                    <div class="fp-tl-event-desc">Mailing date per citation document</div>
+                                    <div class="fp-tl-event-tags"><span class="fp-tag accent">Source: Citation</span><span class="fp-tag danger">Conflict with postmark</span></div>
+                                </div>
+                                <div class="fp-tl-event warn">
+                                    <div class="fp-tl-event-date">Jul 24, 2026</div>
+                                    <div class="fp-tl-event-title">Postmark date (actual)</div>
+                                    <div class="fp-tl-event-desc">USPS postmark shows Jul 24, not Jul 22</div>
+                                    <div class="fp-tl-event-tags"><span class="fp-tag accent">Source: Postmark cert</span><span class="fp-tag warning">Discrepancy</span></div>
+                                </div>
+                                <div class="fp-tl-gap">
+                                    <div class="fp-tl-gap-title">⚠️ 2-day gap flagged</div>
+                                    <div class="fp-tl-gap-desc">Citation claims Jul 22 mailing, postmark shows Jul 24. HCC § 351-7 requires mailing within 3 business days of execution. Timeline agent flagged this as a potential deviation — statute_matching agent confirms the window may be exceeded.</div>
+                                </div>
+                                <div class="fp-tl-event info">
+                                    <div class="fp-tl-event-date">Jul 30, 2026</div>
+                                    <div class="fp-tl-event-title">Hearing scheduled</div>
+                                    <div class="fp-tl-event-desc">Hearing set for Aug 14, 2026</div>
+                                    <div class="fp-tl-event-tags"><span class="fp-tag accent">Source: Hearing notice</span><span class="fp-tag success">Verified</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Gap Analysis</div>
+                            <div style="margin-top:12px;">
+                                <div class="fp-health-row"><span>Execution → Mailing (claimed)</span><span class="fp-tag warning">7 days</span></div>
+                                <div class="fp-health-row"><span>Execution → Mailing (postmark)</span><span class="fp-tag danger">9 days</span></div>
+                                <div class="fp-health-row"><span>Required window (HCC § 351-7)</span><span class="fp-tag">3 business days</span></div>
+                                <div class="fp-health-row"><span>Mailing → Hearing</span><span class="fp-tag success">23 days</span></div>
+                                <div class="fp-health-row"><span>Required minimum (HCC § 351-7)</span><span class="fp-tag">10 days</span></div>
+                            </div>
+                            <div style="margin-top:16px;padding:12px;border-radius:8px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);">
+                                <div style="font-size:13px;font-weight:600;color:var(--danger);">Deviation Detected</div>
+                                <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;">The timeline agent computed 9 days between execution and postmark date. This exceeds the 3-business-day requirement. The statute_matching agent has labeled this as "deviation detected" — not "non-compliant" — per the neutrality guardrail.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: DISCREPANCCIES (V3 NEW)
+                ============================================================ -->
+                <div class="fp-page" id="page-discrepancies">
+                    <h1 class="fp-page-title">Discrepancy Matrix</h1>
+                    <p class="fp-page-subtitle">Side-by-side comparison of conflicting facts. The discrepancy agent characterizes conflicts — it does not resolve them.</p>
+                    <div class="fp-panel">
+                        <div class="fp-panel-title">Discrepancy #1 — Mailing Date Conflict</div>
+                        <div class="fp-grid-2" style="margin-top:16px;align-items:center;">
+                            <div class="fp-disc-cell fp-disc-conflict">
+                                <div class="source">Source A — Citation Document</div>
+                                <div class="claim">Mailed on July 22, 2026</div>
+                                <div class="meta">SHA-256: a3f8b2c1... · Intake: Jul 22, 10:23 AM</div>
+                            </div>
+                            <div style="text-align:center;">
+                                <div style="font-size:24px;color:var(--danger);">VS</div>
+                            </div>
+                            <div class="fp-disc-cell fp-disc-conflict">
+                                <div class="source">Source B — Postmark Certificate</div>
+                                <div class="claim">Postmarked July 24, 2026</div>
+                                <div class="meta">SHA-256: b7e4d9a2... · Intake: Jul 24, 2:15 PM</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:16px;padding:12px;border-radius:8px;background:var(--surface-muted);">
+                            <div style="font-size:13px;font-weight:600;">Agent Characterization</div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;">The citation document claims a mailing date of July 22, but the USPS postmark certificate shows July 24. This creates a 2-day discrepancy. Under HCC § 351-7, the mailing must occur within 3 business days of execution (July 15). The discrepancy agent notes this conflict but does not determine which date is accurate — that determination requires human review.</div>
+                        </div>
+                    </div>
+                    <div class="fp-panel">
+                        <div class="fp-panel-title">Discrepancy #2 — Publication Count</div>
+                        <div class="fp-grid-2" style="margin-top:16px;align-items:center;">
+                            <div class="fp-disc-cell fp-disc-conflict">
+                                <div class="source">Source A — Notice Publication</div>
+                                <div class="claim">Published 1 time (Jul 18)</div>
+                                <div class="meta">SHA-256: c2f1a8b9... · Newspaper: Times-Standard</div>
+                            </div>
+                            <div style="text-align:center;">
+                                <div style="font-size:24px;color:var(--danger);">VS</div>
+                            </div>
+                            <div class="fp-disc-cell fp-disc-conflict">
+                                <div class="source">Source B — Affidavit of Publication</div>
+                                <div class="claim">Published 2 times (Jul 18, Jul 25)</div>
+                                <div class="meta">SHA-256: d3e2b1a0... · Notarized: Jul 26</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="fp-panel">
+                        <div class="fp-panel-title">Discrepancy #3 — Signature Verification</div>
+                        <div class="fp-grid-2" style="margin-top:16px;align-items:center;">
+                            <div class="fp-disc-cell">
+                                <div class="source">Source A — Document</div>
+                                <div class="claim">Signed by Deputy Clerk J. Martinez</div>
+                                <div class="meta">SHA-256: e4f3c2b1... · Page 3 of 7</div>
+                            </div>
+                            <div style="text-align:center;">
+                                <div style="font-size:24px;color:var(--text-quaternary);">VS</div>
+                            </div>
+                            <div class="fp-disc-cell">
+                                <div class="source">Source B — Staff Directory</div>
+                                <div class="claim">J. Martinez on leave Jul 15-20</div>
+                                <div class="meta">HR record · Updated Jul 10</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: DEADLINE ENGINE (V3 NEW)
+                ============================================================ -->
+                <div class="fp-page" id="page-deadline-engine">
+                    <h1 class="fp-page-title">Deadline Engine</h1>
+                    <p class="fp-page-subtitle">Statutory deadline windows overlaid on actual events. Labels show evidentiary status, not legal conclusions.</p>
+                    <div class="fp-panel">
+                        <div class="fp-panel-title">Case CE26-0402 — Mailing Window (HCC § 351-7)</div>
+                        <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:16px;">3 business days from execution to mailing. Actual: 9 calendar days.</div>
+                        <div class="fp-deadline-track">
+                            <div class="fp-deadline-line">
+                                <div class="fp-deadline-segment ok" style="left:0%;width:33%;"></div>
+                                <div class="fp-deadline-segment warn" style="left:33%;width:15%;"></div>
+                                <div class="fp-deadline-segment over" style="left:48%;width:52%;"></div>
+                                <div class="fp-deadline-marker required" style="left:33%;" title="Required deadline (3 business days)"></div>
+                                <div class="fp-deadline-marker actual" style="left:48%;" title="Claimed mailing date (Jul 22)"></div>
+                                <div class="fp-deadline-marker overdue" style="left:60%;" title="Postmark date (Jul 24)"></div>
+                                <div class="fp-deadline-label" style="left:0%;">Jul 15 (Execution)</div>
+                                <div class="fp-deadline-label" style="left:33%;">Jul 18 (Deadline)</div>
+                                <div class="fp-deadline-label" style="left:48%;">Jul 22 (Claimed)</div>
+                                <div class="fp-deadline-label" style="left:60%;">Jul 24 (Postmark)</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+                            <span class="fp-tag success">Within window (Jul 15-18)</span>
+                            <span class="fp-tag warning">Approaching (Jul 18-22)</span>
+                            <span class="fp-tag danger">Exceeded (Jul 22+)</span>
+                        </div>
+                    </div>
+                    <div class="fp-panel">
+                        <div class="fp-panel-title">Case CE26-0398 — Publication Window (HCC § 351-12)</div>
+                        <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:16px;">10 days minimum between first publication and hearing. Actual: 23 days.</div>
+                        <div class="fp-deadline-track">
+                            <div class="fp-deadline-line">
+                                <div class="fp-deadline-segment ok" style="left:0%;width:100%;background:var(--success);"></div>
+                                <div class="fp-deadline-marker actual" style="left:0%;" title="First publication (Jul 18)"></div>
+                                <div class="fp-deadline-marker required" style="left:30%;" title="10-day minimum (Jul 28)"></div>
+                                <div class="fp-deadline-marker actual" style="left:80%;" title="Hearing (Aug 14)"></div>
+                                <div class="fp-deadline-label" style="left:0%;">Jul 18 (Pub)</div>
+                                <div class="fp-deadline-label" style="left:30%;">Jul 28 (Min)</div>
+                                <div class="fp-deadline-label" style="left:80%;">Aug 14 (Hearing)</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+                            <span class="fp-tag success">Within window — 23 days exceeds 10-day minimum</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: STATUTE LIBRARY (V1 depth + V3 deadline viz)
+                ============================================================ -->
+                <div class="fp-page" id="page-rules">
+                    <h1 class="fp-page-title">Statute Library</h1>
+                    <p class="fp-page-subtitle">Jurisdiction-specific procedural rules with deadline windows. Browse, search, and link to active cases.</p>
+                    <div class="fp-panel" style="margin-bottom:16px;">
+                        <div style="display:flex;gap:10px;">
+                            <input type="text" placeholder="Search statutes by reference, title, or keyword..." style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px;font-family:inherit;outline:none;" />
+                            <button class="fp-btn primary">Search</button>
+                        </div>
+                    </div>
+                    <div class="fp-statute-card">
+                        <div class="fp-statute-ref">HCC § 351-7</div>
+                        <div class="fp-statute-title">Notice of Citation — Mailing Requirements</div>
+                        <div class="fp-statute-desc">A citation issued under this chapter shall be mailed to the respondent within three business days of execution. The mailing date shall be the date of postmark.</div>
+                        <div class="fp-statute-window">
+                            <div class="fp-statute-window-bar">
+                                <div class="fp-statute-window-fill" style="left:0%;width:30%;background:var(--success);"></div>
+                            </div>
+                            <div class="fp-statute-window-label">3 business days</div>
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+                            <span class="fp-tag accent">3 active cases</span>
+                            <span class="fp-tag warning">1 deviation detected</span>
+                        </div>
+                    </div>
+                    <div class="fp-statute-card">
+                        <div class="fp-statute-ref">HCC § 351-12</div>
+                        <div class="fp-statute-title">Publication of Hearing Notices</div>
+                        <div class="fp-statute-desc">Notice of public hearing shall be published at least once in a newspaper of general circulation not less than ten days before the hearing date.</div>
+                        <div class="fp-statute-window">
+                            <div class="fp-statute-window-bar">
+                                <div class="fp-statute-window-fill" style="left:0%;width:60%;background:var(--success);"></div>
+                            </div>
+                            <div class="fp-statute-window-label">10 days minimum</div>
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+                            <span class="fp-tag accent">2 active cases</span>
+                            <span class="fp-tag success">All within window</span>
+                        </div>
+                    </div>
+                    <div class="fp-statute-card">
+                        <div class="fp-statute-ref">CA Gov Code § 65852.2</div>
+                        <div class="fp-statute-title">Accessory Dwelling Units — Permit Timeline</div>
+                        <div class="fp-statute-desc">A city or county shall approve or disapprove an application for an ADU within 60 days of receiving a complete application. Failure to act within 60 days is deemed approved.</div>
+                        <div class="fp-statute-window">
+                            <div class="fp-statute-window-bar">
+                                <div class="fp-statute-window-fill" style="left:0%;width:85%;background:var(--warning);"></div>
+                            </div>
+                            <div class="fp-statute-window-label">60 days</div>
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+                            <span class="fp-tag accent">1 active case</span>
+                            <span class="fp-tag warning">Approaching deadline</span>
+                        </div>
+                    </div>
+                    <div class="fp-statute-card">
+                        <div class="fp-statute-ref">HCC § 4.2</div>
+                        <div class="fp-statute-title">Notice Requirements — Code Enforcement</div>
+                        <div class="fp-statute-desc">Notice of code enforcement action shall be posted on the property and mailed to the owner of record within five business days of the enforcement action.</div>
+                        <div class="fp-statute-window">
+                            <div class="fp-statute-window-bar">
+                                <div class="fp-statute-window-fill" style="left:0%;width:40%;background:var(--success);"></div>
+                            </div>
+                            <div class="fp-statute-window-label">5 business days</div>
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+                            <span class="fp-tag accent">1 active case</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: POLICY STUDIO (V1 depth — full rule builder)
+                ============================================================ -->
+                <div class="fp-page" id="page-policy-studio">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+                        <h1 class="fp-page-title" style="margin-bottom:0;">Policy Studio</h1>
+                        <div style="display:flex;gap:8px;">
+                            <button class="fp-btn">Discard</button>
+                            <button class="fp-btn">Save Draft</button>
+                            <button class="fp-btn primary">Publish Rule</button>
+                        </div>
+                    </div>
+                    <p class="fp-page-subtitle">Create and manage procedural rules. Publishing triggers the statute_matching agent to preview impact against all active cases.</p>
+                    <div class="fp-ps-layout">
+                        <!-- Rule list -->
+                        <div class="fp-ps-sidebar">
+                            <div class="fp-panel" style="padding:12px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                    <div class="fp-panel-title">Rules</div>
+                                    <button class="fp-btn sm primary">+ New</button>
+                                </div>
+                            </div>
+                            <div class="fp-ps-rule-item active">
+                                <div class="fp-ps-rule-name">Citation Mailing Window</div>
+                                <div class="fp-ps-rule-ref">HCC § 351-7 · 3 business days</div>
+                            </div>
+                            <div class="fp-ps-rule-item">
+                                <div class="fp-ps-rule-name">Publication Notice Period</div>
+                                <div class="fp-ps-rule-ref">HCC § 351-12 · 10 days min</div>
+                            </div>
+                            <div class="fp-ps-rule-item">
+                                <div class="fp-ps-rule-name">ADU Permit Decision</div>
+                                <div class="fp-ps-rule-ref">CA Gov Code § 65852.2 · 60 days</div>
+                            </div>
+                            <div class="fp-ps-rule-item">
+                                <div class="fp-ps-rule-name">Code Enforcement Notice</div>
+                                <div class="fp-ps-rule-ref">HCC § 4.2 · 5 business days</div>
+                            </div>
+                            <div class="fp-ps-rule-item">
+                                <div class="fp-ps-rule-name">Appeal Filing Window</div>
+                                <div class="fp-ps-rule-ref">HCC § 351-15 · 15 days</div>
+                            </div>
+                            <div class="fp-ps-rule-item">
+                                <div class="fp-ps-rule-name">Environmental Review Period</div>
+                                <div class="fp-ps-rule-ref">CEQA § 15073 · 30 days</div>
+                            </div>
+                        </div>
+                        <!-- Rule editor -->
+                        <div class="fp-ps-editor">
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Rule Name</div>
+                                <input type="text" class="fp-ps-input" value="Citation Mailing Window" />
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Statute Reference</div>
+                                <input type="text" class="fp-ps-input" value="HCC § 351-7" />
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Jurisdiction</div>
+                                <select class="fp-ps-select">
+                                    <option>Humboldt County</option>
+                                    <option>State of California</option>
+                                </select>
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Category</div>
+                                <select class="fp-ps-select">
+                                    <option>Notice Requirements</option>
+                                    <option>Permit Timeline</option>
+                                    <option>Publication</option>
+                                    <option>Appeals</option>
+                                </select>
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Description</div>
+                                <textarea class="fp-ps-input fp-ps-textarea">A citation issued under this chapter shall be mailed to the respondent within three business days of execution. The mailing date shall be the date of postmark.</textarea>
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Deadline Type</div>
+                                <select class="fp-ps-select">
+                                    <option>Business days</option>
+                                    <option>Calendar days</option>
+                                </select>
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Deadline Value</div>
+                                <input type="number" class="fp-ps-input" value="3" style="width:120px;" />
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Start Event (Trigger)</div>
+                                <select class="fp-ps-select">
+                                    <option>Citation execution</option>
+                                    <option>Document filing</option>
+                                    <option>Enforcement action</option>
+                                </select>
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">End Event (Completion)</div>
+                                <select class="fp-ps-select">
+                                    <option>Mailing (postmark date)</option>
+                                    <option>Publication date</option>
+                                    <option>Decision rendered</option>
+                                </select>
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Tags</div>
+                                <div>
+                                    <span class="fp-ps-tag accent">notice</span>
+                                    <span class="fp-ps-tag accent">citation</span>
+                                    <span class="fp-ps-tag accent">mailing</span>
+                                    <span class="fp-ps-tag accent">3-business-day</span>
+                                </div>
+                            </div>
+                            <div class="fp-ps-field">
+                                <div class="fp-ps-label">Agent Guardrail</div>
+                                <div style="padding:12px;border-radius:8px;background:var(--surface-muted);border:1px solid var(--border);font-size:12px;color:var(--text-tertiary);">
+                                    "You identify evidentiary status. You do not render legal conclusions."
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Impact preview -->
+                        <div class="fp-ps-impact-panel">
+                            <div class="fp-ps-impact-title">
+                                ⚡ Impact Preview
+                            </div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:16px;">Cases that would be affected by this rule. Updated by the statute_matching agent.</div>
+                            <div class="fp-ps-impact-case">
+                                <div class="fp-ps-impact-case-id">CE26-0402</div>
+                                <div class="fp-ps-impact-case-desc">Citation Mailing Compliance</div>
+                                <div class="fp-ps-impact-case-status" style="color:var(--danger);">Deviation detected — 9 days vs 3-day window</div>
+                            </div>
+                            <div class="fp-ps-impact-case">
+                                <div class="fp-ps-impact-case-id">CE26-0387</div>
+                                <div class="fp-ps-impact-case-desc">Notice Publication Timeline</div>
+                                <div class="fp-ps-impact-case-status" style="color:var(--warning);">Unable to determine — mailing date missing</div>
+                            </div>
+                            <div class="fp-ps-impact-case">
+                                <div class="fp-ps-impact-case-id">CE26-0298</div>
+                                <div class="fp-ps-impact-case-desc">Appeal Filing Deadline</div>
+                                <div class="fp-ps-impact-case-status" style="color:var(--success);">Matches expected window — 2 days</div>
+                            </div>
+                            <div class="fp-ps-impact-case">
+                                <div class="fp-ps-impact-case-id">CE26-0331</div>
+                                <div class="fp-ps-impact-case-desc">Code Enforcement Notice</div>
+                                <div class="fp-ps-impact-case-status" style="color:var(--warning);">Needs evidence — no mailing record</div>
+                            </div>
+                            <div style="margin-top:16px;padding:12px;border-radius:8px;background:var(--accent-light);">
+                                <div style="font-size:12px;font-weight:600;color:var(--accent);">Publishing this rule will trigger statute_matching_agent against all 7 active cases.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: NEUTRALITY GUARDRAILS (V3 NEW)
+                ============================================================ -->
+                <div class="fp-page" id="page-guardrails">
+                    <h1 class="fp-page-title">Neutrality Guardrails</h1>
+                    <p class="fp-page-subtitle">Every place an agent attempted a legal conclusion and was rolled back to evidentiary status. This is your defensibility story.</p>
+                    <div class="fp-grid-2">
+                        <div>
+                            <div class="fp-panel">
+                                <div class="fp-panel-title">Guardrail Events (Last 30 Days)</div>
+                                <div class="fp-grid-2" style="margin-top:12px;">
+                                    <div class="fp-stat"><div class="fp-stat-label">Blocked Conclusions</div><div class="fp-stat-value">47</div></div>
+                                    <div class="fp-stat"><div class="fp-stat-label">Rewritten to Status</div><div class="fp-stat-value">47</div></div>
+                                </div>
+                            </div>
+                            <div class="fp-guardrail-item blocked">
+                                <div class="fp-guardrail-icon">🚫</div>
+                                <div class="fp-guardrail-content">
+                                    <div class="fp-guardrail-label">Blocked: "non-compliant"</div>
+                                    <div class="fp-guardrail-detail">statute_matching_agent on CE26-0402 · Jul 24, 2026</div>
+                                    <div class="fp-guardrail-code">"non-compliant" → "deviation detected"</div>
+                                </div>
+                            </div>
+                            <div class="fp-guardrail-item blocked">
+                                <div class="fp-guardrail-icon">🚫</div>
+                                <div class="fp-guardrail-content">
+                                    <div class="fp-guardrail-label">Blocked: "violation of law"</div>
+                                    <div class="fp-guardrail-detail">statute_matching_agent on CE26-0387 · Jul 20, 2026</div>
+                                    <div class="fp-guardrail-code">"violation of law" → "deviation detected"</div>
+                                </div>
+                            </div>
+                            <div class="fp-guardrail-item blocked">
+                                <div class="fp-guardrail-icon">🚫</div>
+                                <div class="fp-guardrail-content">
+                                    <div class="fp-guardrail-label">Blocked: "unlawful delay"</div>
+                                    <div class="fp-guardrail-detail">timeline_agent on CE26-0398 · Jul 18, 2026</div>
+                                    <div class="fp-guardrail-code">"unlawful delay" → "gap exceeding expected window"</div>
+                                </div>
+                            </div>
+                            <div class="fp-guardrail-item blocked">
+                                <div class="fp-guardrail-icon">🚫</div>
+                                <div class="fp-guardrail-content">
+                                    <div class="fp-guardrail-label">Blocked: "citation is invalid"</div>
+                                    <div class="fp-guardrail-detail">discrepancy_agent on CE26-0402 · Jul 24, 2026</div>
+                                    <div class="fp-guardrail-code">"citation is invalid" → "conflict between sources identified"</div>
+                                </div>
+                            </div>
+                            <div class="fp-guardrail-item warn">
+                                <div class="fp-guardrail-icon">⚠️</div>
+                                <div class="fp-guardrail-content">
+                                    <div class="fp-guardrail-label">Warning: "compliant"</div>
+                                    <div class="fp-guardrail-detail">statute_matching_agent on CE26-0298 · Jul 15, 2026</div>
+                                    <div class="fp-guardrail-code">"compliant" → "matches expected window"</div>
+                                </div>
+                            </div>
+                            <div class="fp-guardrail-item warn">
+                                <div class="fp-guardrail-icon">⚠️</div>
+                                <div class="fp-guardrail-content">
+                                    <div class="fp-guardrail-label">Warning: "should be rejected"</div>
+                                    <div class="fp-guardrail-detail">fact_extraction_agent on CE26-0354 · Jul 12, 2026</div>
+                                    <div class="fp-guardrail-code">"should be rejected" → "requires human review"</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Guardrail Configuration</div>
+                            <div style="margin-top:16px;">
+                                <div class="fp-health-row"><span>Block: "compliant" / "non-compliant"</span><span class="fp-tag success">Active</span></div>
+                                <div class="fp-health-row"><span>Block: "violation" / "unlawful"</span><span class="fp-tag success">Active</span></div>
+                                <div class="fp-health-row"><span>Block: "invalid" / "void"</span><span class="fp-tag success">Active</span></div>
+                                <div class="fp-health-row"><span>Block: "should" / "must" (prescriptive)</span><span class="fp-tag success">Active</span></div>
+                                <div class="fp-health-row"><span>Block: "guilty" / "liable"</span><span class="fp-tag success">Active</span></div>
+                                <div class="fp-health-row"><span>Rewrite to evidentiary status</span><span class="fp-tag success">Auto</span></div>
+                                <div class="fp-health-row"><span>Log every block to audit ledger</span><span class="fp-tag success">Auto</span></div>
+                            </div>
+                            <div style="margin-top:16px;padding:12px;border-radius:8px;background:var(--surface-muted);">
+                                <div style="font-size:13px;font-weight:600;">System Guardrail (appended to every agent prompt)</div>
+                                <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;font-family:monospace;">"You identify evidentiary status. You do not render legal conclusions."</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: PROCEDURAL GRAPHS (V3 NEW)
+                ============================================================ -->
+                <div class="fp-page" id="page-proc-builder">
+                    <h1 class="fp-page-title">Procedural Graph Builder</h1>
+                    <p class="fp-page-subtitle">Define expected procedural flows for a jurisdiction. Agents compare actual events against these graphs to detect deviations.</p>
+                    <div class="fp-grid-2">
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Citation Process — Humboldt County</div>
+                            <div style="margin-top:16px;">
+                                <div class="fp-proc-stage">
+                                    <div class="fp-proc-stage-num">1</div>
+                                    <div class="fp-proc-stage-content">
+                                        <div class="fp-proc-stage-name">Citation executed</div>
+                                        <div class="fp-proc-stage-rule">Clerk signs and dates citation</div>
+                                    </div>
+                                    <div class="fp-proc-stage-deadline">Start</div>
+                                </div>
+                                <div class="fp-proc-stage">
+                                    <div class="fp-proc-stage-num">2</div>
+                                    <div class="fp-proc-stage-content">
+                                        <div class="fp-proc-stage-name">Citation mailed to respondent</div>
+                                        <div class="fp-proc-stage-rule">HCC § 351-7 — postmark within 3 business days</div>
+                                    </div>
+                                    <div class="fp-proc-stage-deadline" style="color:var(--danger);">≤ 3 business days</div>
+                                </div>
+                                <div class="fp-proc-stage">
+                                    <div class="fp-proc-stage-num">3</div>
+                                    <div class="fp-proc-stage-content">
+                                        <div class="fp-proc-stage-name">Proof of service filed</div>
+                                        <div class="fp-proc-stage-rule">Postmark certificate or affidavit</div>
+                                    </div>
+                                    <div class="fp-proc-stage-deadline">Same day</div>
+                                </div>
+                                <div class="fp-proc-stage">
+                                    <div class="fp-proc-stage-num">4</div>
+                                    <div class="fp-proc-stage-content">
+                                        <div class="fp-proc-stage-name">Response period</div>
+                                        <div class="fp-proc-stage-rule">Respondent may file response</div>
+                                    </div>
+                                    <div class="fp-proc-stage-deadline">15 days</div>
+                                </div>
+                                <div class="fp-proc-stage">
+                                    <div class="fp-proc-stage-num">5</div>
+                                    <div class="fp-proc-stage-content">
+                                        <div class="fp-proc-stage-name">Hearing notice published</div>
+                                        <div class="fp-proc-stage-rule">HCC § 351-12 — 10 days before hearing</div>
+                                    </div>
+                                    <div class="fp-proc-stage-deadline" style="color:var(--warning);">≥ 10 days before</div>
+                                </div>
+                                <div class="fp-proc-stage">
+                                    <div class="fp-proc-stage-num">6</div>
+                                    <div class="fp-proc-stage-content">
+                                        <div class="fp-proc-stage-name">Hearing conducted</div>
+                                        <div class="fp-proc-stage-rule">Recorded, transcribed</div>
+                                    </div>
+                                    <div class="fp-proc-stage-deadline">Scheduled</div>
+                                </div>
+                                <div class="fp-proc-stage">
+                                    <div class="fp-proc-stage-num">7</div>
+                                    <div class="fp-proc-stage-content">
+                                        <div class="fp-proc-stage-name">Decision issued</div>
+                                        <div class="fp-proc-stage-rule">Written findings within 30 days</div>
+                                    </div>
+                                    <div class="fp-proc-stage-deadline">≤ 30 days</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Deviation Summary — CE26-0402</div>
+                            <div style="margin-top:16px;">
+                                <div class="fp-health-row"><span>Stage 1 → 2: Execution → Mailing</span><span class="fp-tag danger">9 days (required: ≤ 3)</span></div>
+                                <div class="fp-health-row"><span>Stage 2 → 3: Mailing → Proof filed</span><span class="fp-tag warning">2 days (expected: same day)</span></div>
+                                <div class="fp-health-row"><span>Stage 3 → 4: Proof → Response period</span><span class="fp-tag success">Same day</span></div>
+                                <div class="fp-health-row"><span>Stage 4 → 5: Response → Hearing notice</span><span class="fp-tag success">18 days (within window)</span></div>
+                                <div class="fp-health-row"><span>Stage 5 → 6: Notice → Hearing</span><span class="fp-tag success">23 days (≥ 10 required)</span></div>
+                                <div class="fp-health-row"><span>Stage 6 → 7: Hearing → Decision</span><span class="fp-tag info">Pending</span></div>
+                            </div>
+                            <div style="margin-top:16px;padding:12px;border-radius:8px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);">
+                                <div style="font-size:13px;font-weight:600;color:var(--danger);">1 deviation detected</div>
+                                <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;">The timeline agent compared actual events against the procedural graph and flagged Stage 1→2 as exceeding the statutory window. The statute_matching agent confirmed this as a "deviation detected" — not a legal conclusion.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: AUDIT LEDGER (V3 NEW)
+                ============================================================ -->
+                <div class="fp-page" id="page-ledger">
+                    <h1 class="fp-page-title">Audit Ledger</h1>
+                    <p class="fp-page-subtitle">Immutable record of every action — human and agent. Same hash scheme, same log table. Nothing an agent does is invisible.</p>
+                    <div class="fp-grid-4" style="margin-bottom:16px;">
+                        <div class="fp-stat"><div class="fp-stat-label">Total Entries</div><div class="fp-stat-value">4,821</div></div>
+                        <div class="fp-stat"><div class="fp-stat-label">Agent Actions</div><div class="fp-stat-value">3,192</div><div class="fp-stat-delta neutral">66% of total</div></div>
+                        <div class="fp-stat"><div class="fp-stat-label">Human Actions</div><div class="fp-stat-value">1,629</div><div class="fp-stat-delta neutral">34% of total</div></div>
+                        <div class="fp-stat"><div class="fp-stat-label">Guardrail Blocks</div><div class="fp-stat-value">47</div></div>
+                    </div>
+                    <div class="fp-panel">
+                        <div class="fp-panel-header">
+                            <div class="fp-panel-title">Recent Entries</div>
+                            <div style="display:flex;gap:8px;">
+                                <button class="fp-btn sm">All</button>
+                                <button class="fp-btn sm">Agent Only</button>
+                                <button class="fp-btn sm">Human Only</button>
+                                <button class="fp-btn sm">Guardrails</button>
+                            </div>
+                        </div>
+                        <div class="fp-ledger-entry">
+                            <div class="fp-ledger-icon agent">🤖</div>
+                            <div class="fp-ledger-content">
+                                <div class="fp-ledger-title">statute_matching_agent — CE26-0402</div>
+                                <div class="fp-ledger-meta">Jul 24, 2026 2:17 PM · status: success · guardrail: 1 block rewritten</div>
+                            </div>
+                            <div class="fp-ledger-hash">a9b8c7d6e5f4</div>
+                        </div>
+                        <div class="fp-ledger-entry">
+                            <div class="fp-ledger-icon agent">🤖</div>
+                            <div class="fp-ledger-content">
+                                <div class="fp-ledger-title">discrepancy_agent — CE26-0402</div>
+                                <div class="fp-ledger-meta">Jul 24, 2026 2:17 PM · status: success · conflict: mailing date</div>
+                            </div>
+                            <div class="fp-ledger-hash">b8c7d6e5f4a3</div>
+                        </div>
+                        <div class="fp-ledger-entry">
+                            <div class="fp-ledger-icon agent">🤖</div>
+                            <div class="fp-ledger-content">
+                                <div class="fp-ledger-title">fact_extraction_agent — CE26-0402</div>
+                                <div class="fp-ledger-meta">Jul 24, 2026 2:16 PM · status: success · extracted 5 facts</div>
+                            </div>
+                            <div class="fp-ledger-hash">c7d6e5f4a3b2</div>
+                        </div>
+                        <div class="fp-ledger-entry">
+                            <div class="fp-ledger-icon human">👤</div>
+                            <div class="fp-ledger-content">
+                                <div class="fp-ledger-title">Jim — uploaded postmark certificate</div>
+                                <div class="fp-ledger-meta">Jul 24, 2026 2:15 PM · triggered: fact_extraction_agent</div>
+                            </div>
+                            <div class="fp-ledger-hash">d6e5f4a3b2c1</div>
+                        </div>
+                        <div class="fp-ledger-entry">
+                            <div class="fp-ledger-icon agent">🤖</div>
+                            <div class="fp-ledger-content">
+                                <div class="fp-ledger-title">timeline_agent — CE26-0402</div>
+                                <div class="fp-ledger-meta">Jul 24, 2026 2:17 PM · status: success · gap flagged: 2 days</div>
+                            </div>
+                            <div class="fp-ledger-hash">e5f4a3b2c1d0</div>
+                        </div>
+                        <div class="fp-ledger-entry">
+                            <div class="fp-ledger-icon human">👤</div>
+                            <div class="fp-ledger-content">
+                                <div class="fp-ledger-title">Jim — opened case CE26-0402</div>
+                                <div class="fp-ledger-meta">Jul 22, 2026 10:22 AM · page: evidence_viewer</div>
+                            </div>
+                            <div class="fp-ledger-hash">f4a3b2c1d0e9</div>
+                        </div>
+                        <div class="fp-ledger-entry">
+                            <div class="fp-ledger-icon agent">🤖</div>
+                            <div class="fp-ledger-content">
+                                <div class="fp-ledger-title">fact_extraction_agent — CE26-0402</div>
+                                <div class="fp-ledger-meta">Jul 22, 2026 10:24 AM · status: success · extracted 8 facts</div>
+                            </div>
+                            <div class="fp-ledger-hash">a3b2c1d0e9f8</div>
+                        </div>
+                        <div class="fp-ledger-entry">
+                            <div class="fp-ledger-icon human">👤</div>
+                            <div class="fp-ledger-content">
+                                <div class="fp-ledger-title">Jim — uploaded citation document</div>
+                                <div class="fp-ledger-meta">Jul 22, 2026 10:23 AM · triggered: document_agent → fact_extraction</div>
+                            </div>
+                            <div class="fp-ledger-hash">b2c1d0e9f8a7</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: DOCUMENTS
+                ============================================================ -->
+                <div class="fp-page" id="page-documents">
+                    <h1 class="fp-page-title">Documents</h1>
+                    <p class="fp-page-subtitle">All ingested documents, classified and hashed. New uploads trigger the document_agent → fact_extraction_agent pipeline.</p>
+                    <div class="fp-panel">
+                        <table class="fp-table">
+                            <thead><tr><th>Filename</th><th>Case</th><th>Type</th><th>Uploaded</th><th>Hash</th><th>Status</th></tr></thead>
+                            <tbody>
+                                <tr><td>citation_CE26-0402.pdf</td><td class="mono">CE26-0402</td><td><span class="fp-tag">Citation</span></td><td>Jul 22, 2026</td><td class="mono">a3f8b2c1...</td><td><span class="fp-tag success">Extracted</span></td></tr>
+                                <tr><td>postmark_cert.pdf</td><td class="mono">CE26-0402</td><td><span class="fp-tag">Certificate</span></td><td>Jul 24, 2026</td><td class="mono">b7e4d9a2...</td><td><span class="fp-tag warning">Discrepancy</span></td></tr>
+                                <tr><td>hearing_notice_CE26-0398.pdf</td><td class="mono">CE26-0398</td><td><span class="fp-tag">Notice</span></td><td>Jul 18, 2026</td><td class="mono">c2f1a8b9...</td><td><span class="fp-tag success">Extracted</span></td></tr>
+                                <tr><td>adu_application.pdf</td><td class="mono">CE26-0398</td><td><span class="fp-tag">Application</span></td><td>Jul 10, 2026</td><td class="mono">d3e2b1a0...</td><td><span class="fp-tag success">Extracted</span></td></tr>
+                                <tr><td>publication_affidavit.pdf</td><td class="mono">CE26-0387</td><td><span class="fp-tag">Affidavit</span></td><td>Jul 20, 2026</td><td class="mono">e4f3c2b1...</td><td><span class="fp-tag warning">Discrepancy</span></td></tr>
+                                <tr><td>env_review_checklist.pdf</td><td class="mono">CE26-0371</td><td><span class="fp-tag">Checklist</span></td><td>Jun 28, 2026</td><td class="mono">f5a4b3c2...</td><td><span class="fp-tag success">Extracted</span></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="fp-panel">
+                        <div style="display:flex;align-items:center;gap:12px;padding:20px;border:2px dashed var(--border);border-radius:var(--radius);text-align:center;cursor:pointer;" onclick="alert('File picker would open here')">
+                            <div style="margin:0 auto;">
+                                <div style="font-size:24px;margin-bottom:8px;">📤</div>
+                                <div style="font-size:14px;font-weight:500;">Drop documents here to upload</div>
+                                <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;">PDF, DOCX, images · triggers document_agent → fact_extraction_agent</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: KNOWLEDGE GRAPH
+                ============================================================ -->
+                <div class="fp-page" id="page-knowledge-graph">
+                    <h1 class="fp-page-title">Knowledge Graph</h1>
+                    <p class="fp-page-subtitle">Connected regulations, permits, properties, and requirements. Powered by Cloudflare Vectorize embeddings.</p>
+                    <div class="fp-panel" style="padding:30px;text-align:center;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                        <div style="font-size:48px;margin-bottom:12px;">🌐</div>
+                        <div style="font-weight:600;font-size:18px;">12,847 Nodes · 43,291 Edges</div>
+                        <div style="font-size:13px;color:var(--text-tertiary);margin-top:4px;">123 Main St → Parcel → Zoning R-1 → ADU → Permits → Codes</div>
+                        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                            <span class="fp-tag accent">Parcel #123-456-789</span>
+                            <span class="fp-tag accent">Zoning R-1</span>
+                            <span class="fp-tag">ADU</span>
+                            <span class="fp-tag">Building Permit</span>
+                            <span class="fp-tag">CA Gov Code § 65852.2</span>
+                            <span class="fp-tag">HCC § 351-7</span>
+                            <span class="fp-tag">Notice Requirements</span>
+                            <span class="fp-tag">3-business-day window</span>
+                        </div>
+                    </div>
+                    <div class="fp-grid-2" style="margin-top:16px;">
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Node Types</div>
+                            <div class="fp-health-row"><span>📍 Parcels</span><span>4,212</span></div>
+                            <div class="fp-health-row"><span>📜 Statutes</span><span>847</span></div>
+                            <div class="fp-health-row"><span>🏛 Agencies</span><span>23</span></div>
+                            <div class="fp-health-row"><span>📋 Permit Types</span><span>156</span></div>
+                            <div class="fp-health-row"><span>📄 Cases</span><span>7,609</span></div>
+                        </div>
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Vectorize Status</div>
+                            <div class="fp-health-row"><span>Embedding model</span><span class="mono" style="font-size:11px;">@cf/baai/bge-base-en-v1.5</span></div>
+                            <div class="fp-health-row"><span>Index size</span><span>12,847 vectors</span></div>
+                            <div class="fp-health-row"><span>Last sync</span><span>Today, 10:30 AM</span></div>
+                            <div class="fp-health-row"><span>Query latency (p95)</span><span class="fp-tag success">12ms</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: RECORDS WATCH (V3 NEW)
+                ============================================================ -->
+                <div class="fp-page" id="page-records-watch">
+                    <h1 class="fp-page-title">Public Records Watch</h1>
+                    <p class="fp-page-subtitle">Real-time detection of changes in public records that might affect active cases. Powered by scheduled polling of recorder, assessor, and court systems.</p>
+                    <div class="fp-grid-4" style="margin-bottom:16px;">
+                        <div class="fp-stat"><div class="fp-stat-label">New Changes</div><div class="fp-stat-value" style="color:var(--danger);">5</div></div>
+                        <div class="fp-stat"><div class="fp-stat-label">Recent (7 days)</div><div class="fp-stat-value">12</div></div>
+                        <div class="fp-stat"><div class="fp-stat-label">Cases Impacted</div><div class="fp-stat-value">3</div></div>
+                        <div class="fp-stat"><div class="fp-stat-label">Sources Watched</div><div class="fp-stat-value">8</div></div>
+                    </div>
+                    <div class="fp-panel">
+                        <div class="fp-panel-title">Change Feed</div>
+                        <div class="fp-watch-item">
+                            <div class="fp-watch-dot new"></div>
+                            <div class="fp-watch-content">
+                                <div class="fp-watch-title">Humboldt County Code § 4.2 amended — notice timeline changed from 5 to 3 business days</div>
+                                <div class="fp-watch-meta">Source: Humboldt County Code · Detected: 2 hours ago</div>
+                                <div class="fp-watch-impact" style="color:var(--danger);">Impacts: CE26-0331, CE26-0402 (2 active cases)</div>
+                            </div>
+                        </div>
+                        <div class="fp-watch-item">
+                            <div class="fp-watch-dot new"></div>
+                            <div class="fp-watch-content">
+                                <div class="fp-watch-title">Parcel #123-456-789 — ownership transfer recorded</div>
+                                <div class="fp-watch-meta">Source: Humboldt County Recorder · Detected: 5 hours ago</div>
+                                <div class="fp-watch-impact" style="color:var(--warning);">Impacts: CE26-0398 (citation recipient changed)</div>
+                            </div>
+                        </div>
+                        <div class="fp-watch-item">
+                            <div class="fp-watch-dot new"></div>
+                            <div class="fp-watch-content">
+                                <div class="fp-watch-title">New fee schedule published — Building permit fees updated</div>
+                                <div class="fp-watch-meta">Source: Building & Safety · Detected: 1 day ago</div>
+                                <div class="fp-watch-impact" style="color:var(--text-tertiary);">No active cases impacted</div>
+                            </div>
+                        </div>
+                        <div class="fp-watch-item">
+                            <div class="fp-watch-dot recent"></div>
+                            <div class="fp-watch-content">
+                                <div class="fp-watch-title">Planning Commission meeting schedule changed — August hearing moved to Aug 21</div>
+                                <div class="fp-watch-meta">Source: Planning Department · Detected: 3 days ago</div>
+                                <div class="fp-watch-impact" style="color:var(--warning);">Impacts: CE26-0402 (hearing date conflict)</div>
+                            </div>
+                        </div>
+                        <div class="fp-watch-item">
+                            <div class="fp-watch-dot recent"></div>
+                            <div class="fp-watch-content">
+                                <div class="fp-watch-title">CA Gov Code § 65852.2 — ADU law updated (SB 897 effective)</div>
+                                <div class="fp-watch-meta">Source: California Legislature · Detected: 5 days ago</div>
+                                <div class="fp-watch-impact" style="color:var(--danger);">Impacts: CE26-0398 (deadline calculation changed)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: CONTROL PANEL (V2 shell)
+                ============================================================ -->
+                <div class="fp-page" id="page-control-panel">
+                    <h1 class="fp-page-title">Control Panel</h1>
+                    <p class="fp-page-subtitle">Orchestrator settings and configuration.</p>
+                    <div class="fp-grid-2">
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Orchestrator Configuration</div>
+                            <div style="margin-top:12px;">
+                                <div class="fp-health-row"><span>🎯 Intent Confidence Threshold</span><span>85%</span></div>
+                                <div class="fp-health-row"><span>🧩 Agent Activation Strategy</span><span>Dynamic (auto)</span></div>
+                                <div class="fp-health-row"><span>⚖️ Conflict Resolution</span><span>Human Review Required</span></div>
+                                <div class="fp-health-row"><span>⏱ Context Retention</span><span>30 days</span></div>
+                                <div class="fp-health-row"><span>🌐 Knowledge Graph Sync</span><span>Today, 10:30 AM</span></div>
+                                <div class="fp-health-row"><span>🛡️ Neutrality Guardrails</span><span class="fp-tag success">Active</span></div>
+                                <div class="fp-health-row"><span>📝 Guardrail Logging</span><span class="fp-tag success">Auto to ledger</span></div>
+                            </div>
+                        </div>
+                        <div class="fp-panel">
+                            <div class="fp-panel-title">Cloudflare Configuration</div>
+                            <div style="margin-top:12px;">
+                                <div class="fp-health-row"><span>Workers AI Model</span><span class="mono" style="font-size:11px;">@cf/meta/llama-3-8b-instruct</span></div>
+                                <div class="fp-health-row"><span>Embedding Model</span><span class="mono" style="font-size:11px;">@cf/baai/bge-base-en-v1.5</span></div>
+                                <div class="fp-health-row"><span>Max Tokens</span><span>4,096</span></div>
+                                <div class="fp-health-row"><span>Temperature</span><span>0.7</span></div>
+                                <div class="fp-health-row"><span>Workers Endpoint</span><span class="mono" style="font-size:11px;">fairprocess.workers.dev</span></div>
+                                <div class="fp-health-row"><span>AI Endpoint</span><span class="mono" style="font-size:11px;">fairprocess-ai.workers.dev</span></div>
+                                <div class="fp-health-row"><span>Vectorize Endpoint</span><span class="mono" style="font-size:11px;">fairprocess-vectorize.workers.dev</span></div>
+                                <div class="fp-health-row"><span>D1 Database</span><span class="mono" style="font-size:11px;">fairprocess-db</span></div>
+                                <div class="fp-health-row"><span>R2 Bucket</span><span class="mono" style="font-size:11px;">fairprocess-docs</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: ANALYTICS
+                ============================================================ -->
+                <div class="fp-page" id="page-analytics">
+                    <h1 class="fp-page-title">Analytics</h1>
+                    <p class="fp-page-subtitle">Agent performance, compliance trends, and system metrics.</p>
+                    <div class="fp-analytics-grid">
+                        <div class="fp-chart-container">
+                            <div class="fp-chart-title">📈 Agent Performance (Last 30 Days)</div>
+                            <div style="font-size:12px;padding:4px 0;"><span style="font-weight:600;">Planning</span> — 1,247 queries · 96% accuracy · 3 guardrail blocks</div>
+                            <div style="font-size:12px;padding:4px 0;"><span style="font-weight:600;">Building</span> — 892 queries · 94% accuracy · 1 guardrail block</div>
+                            <div style="font-size:12px;padding:4px 0;"><span style="font-weight:600;">Environmental</span> — 456 queries · 91% accuracy · 0 guardrail blocks</div>
+                            <div style="font-size:12px;padding:4px 0;"><span style="font-weight:600;">Timeline</span> — 2,103 queries · 98% accuracy · 0 guardrail blocks</div>
+                            <div style="font-size:12px;padding:4px 0;"><span style="font-weight:600;">Statute Matching</span> — 1,567 queries · 95% accuracy · 42 guardrail blocks</div>
+                            <div style="font-size:12px;padding:4px 0;"><span style="font-weight:600;">Discrepancy</span> — 234 queries · 99% accuracy · 1 guardrail block</div>
+                        </div>
+                        <div class="fp-chart-container">
+                            <div class="fp-chart-title">📊 Query Trends</div>
+                            <div style="font-size:12px;padding:4px 0;">📅 Daily Queries: ↑ 23% week-over-week</div>
+                            <div style="font-size:12px;padding:4px 0;">📋 Top: ADU (34%), Subdivision (22%), Permits (18%), Code Enforcement (14%), Appeals (12%)</div>
+                            <div style="font-size:12px;padding:4px 0;">⚡ Avg response time: 2.3s</div>
+                            <div style="font-size:12px;padding:4px 0;">🛡️ Guardrail block rate: 1.2% of responses</div>
+                            <div style="font-size:12px;padding:4px 0;">🔀 Tier 1 (deterministic): 78% of routing</div>
+                            <div style="font-size:12px;padding:4px 0;">🔀 Tier 2 (LLM planning): 22% of routing</div>
+                        </div>
+                        <div class="fp-chart-container">
+                            <div class="fp-chart-title">🛡️ Guardrail Effectiveness</div>
+                            <div style="font-size:12px;padding:4px 0;">Total blocks: 47 (last 30 days)</div>
+                            <div style="font-size:12px;padding:4px 0;">"non-compliant" → "deviation detected": 18</div>
+                            <div style="font-size:12px;padding:4px 0;">"compliant" → "matches expected window": 12</div>
+                            <div style="font-size:12px;padding:4px 0;">"violation" → "deviation detected": 9</div>
+                            <div style="font-size:12px;padding:4px 0;">"invalid/void" → "conflict identified": 5</div>
+                            <div style="font-size:12px;padding:4px 0;">Prescriptive language → "requires human review": 3</div>
+                        </div>
+                        <div class="fp-chart-container">
+                            <div class="fp-chart-title">📋 Compliance Trends</div>
+                            <div style="font-size:12px;padding:4px 0;">Cases with deviations: 3/7 (43%)</div>
+                            <div style="font-size:12px;padding:4px 0;">Cases within window: 4/7 (57%)</div>
+                            <div style="font-size:12px;padding:4px 0;">Cases unable to determine: 0/7 (0%)</div>
+                            <div style="font-size:12px;padding:4px 0;">Avg time to deviation detection: 1.4 days</div>
+                            <div style="font-size:12px;padding:4px 0;">Most common deviation: Mailing window exceeded</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                PAGE: AGENT TRAINING
+                ============================================================ -->
+                <div class="fp-page" id="page-agent-training">
+                    <h1 class="fp-page-title">Agent Training</h1>
+                    <p class="fp-page-subtitle">Train AI on jurisdiction-specific processes. Uploaded documents are embedded via Cloudflare Vectorize.</p>
+                    <div class="fp-panel">
+                        <div class="fp-health-row"><span>📚 Humboldt County Code (PDF, 847 pages)</span><span style="color:var(--success);">✅ Loaded · 847 vectors</span></div>
+                        <div class="fp-health-row"><span>📚 Planning Department Manual (PDF, 234 pages)</span><span style="color:var(--success);">✅ Loaded · 234 vectors</span></div>
+                        <div class="fp-health-row"><span>📚 Building Permit Process (DOCX, 47 pages)</span><span style="color:var(--warning);">⏳ Processing</span></div>
+                        <div class="fp-health-row"><span>📚 Fee Schedule (XLSX, 2024)</span><span style="color:var(--success);">✅ Loaded · 12 vectors</span></div>
+                        <div class="fp-health-row"><span>📚 CEQA Guidelines (PDF, 1,203 pages)</span><span style="color:var(--success);">✅ Loaded · 1,203 vectors</span></div>
+                        <div class="fp-health-row"><span>📚 Zoning Ordinance (PDF, 318 pages)</span><span style="color:var(--success);">✅ Loaded · 318 vectors</span></div>
+                    </div>
+                    <div style="margin-top:12px;display:flex;gap:10px;">
+                        <button class="fp-btn primary">📤 Upload Training Data</button>
+                        <button class="fp-btn">🧪 Test Agent</button>
+                        <button class="fp-btn">🔄 Re-embed All</button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ===== Agent Frame (V2 enhanced) ===== -->
+    <div class="fp-agent-frame" id="agentFrame">
+        <div class="fp-agent-header">
+            <div class="fp-agent-header-left">
+                <div class="fp-agent-status">
+                    <span class="dot"></span>
+                    🤖 Agent Mode Active
+                </div>
+                <span style="font-size:12px;color:var(--text-tertiary);">|</span>
+                <span style="font-size:12px;color:var(--text-tertiary);">📍 Humboldt County</span>
+                <span style="font-size:12px;color:var(--text-tertiary);">|</span>
+                <span style="font-size:12px;color:var(--text-tertiary);">🧩 3 agents active</span>
+            </div>
+            <div class="fp-agent-header-actions">
+                <button class="fp-agent-btn" onclick="toggleAgentMode()">⏸ Pause</button>
+                <button class="fp-agent-btn" onclick="simulateAgentStep()">▶ Step</button>
+                <button class="fp-agent-btn danger" onclick="stopAgentMode()">⏹ Stop</button>
+                <button class="fp-agent-btn" onclick="closeAgentFrame()">✕ Close</button>
+            </div>
+        </div>
+        <div class="fp-agent-body">
+            <div class="fp-agent-progress">
+                <div class="fp-agent-progress-header">
+                    <span class="fp-agent-progress-title">🧠 Processing: Citation Compliance Check</span>
+                    <span class="fp-agent-progress-sub" id="progressSub">Ready</span>
+                </div>
+                <div class="fp-agent-progress-bar">
+                    <div class="fill" id="agentProgressFill" style="width:0%;"></div>
+                </div>
+                <div class="fp-agent-progress-meta">
+                    <span id="progressTime">⏱ Not started</span>
+                    <span id="progressSteps">📋 0 of 11 steps</span>
+                </div>
+            </div>
+            <div class="fp-agent-transcript" id="agentTranscript">
+                <div class="fp-agent-transcript-header" id="transcriptHeader">📝 Live Transcript</div>
+                <div id="transcriptContainer"></div>
+            </div>
+            <div class="fp-agent-insights" id="agentInsights">
+                <div class="fp-agent-insights-header">💡 Live Insights</div>
+            </div>
+            <div class="fp-agent-actions">
+                <button class="fp-agent-btn" onclick="document.getElementById('agentTranscript').scrollTop = document.getElementById('agentTranscript').scrollHeight;">📋 View Full Log</button>
+                <button class="fp-agent-btn primary" onclick="simulateAgentStep()">▶ Resume</button>
+                <button class="fp-agent-btn" onclick="stopAgentMode()">⏹ Stop & Save</button>
+                <button class="fp-agent-btn" onclick="alert('Taking manual control...')">🤝 Take Over</button>
+                <span style="font-size:11px;color:var(--text-tertiary);margin-left:auto;display:flex;align-items:center;gap:6px;">
+                    <span class="fp-cf-status">
+                        <span class="dot"></span> Cloudflare Workers AI
+                    </span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
+    JAVASCRIPT — Cloudflare AI Orchestration Layer (V3)
+    ================================================================ -->
+    <script>
+        /**
+         * FairProcess V3 — Cloudflare AI Orchestration Layer
+         *
+         * Architecture:
+         * - Cloudflare Workers: Orchestration routing (agentGateway)
+         * - Cloudflare AI Models: LLM inference (@cf/meta/llama-3-8b-instruct)
+         * - Cloudflare Vectorize: Knowledge Graph embeddings (@cf/baai/bge-base-en-v1.5)
+         * - Cloudflare D1: Relational data (CaseContext, AgentRun, AgentInvocation)
+         * - Cloudflare R2: Document storage
+         * - Cloudflare Access: Authentication
+         *
+         * Agent Core (from spec):
+         * - agentGateway: single entry point for all pages
+         * - orchestrator: two-tier routing (deterministic + LLM planning)
+         * - Specialist agents: fact_extraction, timeline, statute_matching,
+         *   discrepancy, document
+         * - CaseContext: shared state read/written by all agents
+         * - AgentRun: audit ledger entry per agent invocation (SHA-256 hashed)
+         * - Neutrality guardrail: "You identify evidentiary status. You do not
+         *   render legal conclusions."
+         */
+
+        const CONFIG = {
+            API_BASE: 'https://fairprocess.workers.dev',
+            AI_ENDPOINT: 'https://fairprocess-ai.workers.dev',
+            VECTORIZE_ENDPOINT: 'https://fairprocess-vectorize.workers.dev',
+            DEFAULT_MODEL: '@cf/meta/llama-3-8b-instruct',
+            EMBEDDING_MODEL: '@cf/baai/bge-base-en-v1.5',
+            MAX_TOKENS: 4096,
+            TEMPERATURE: 0.7,
+            GUARDRAIL: 'You identify evidentiary status. You do not render legal conclusions.',
+            AGENTS: {
+                planning: { name: 'Planning Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You are a Planning Department expert. Answer zoning, land use, and permit questions. ' },
+                building: { name: 'Building Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You are a Building & Safety expert. Answer code, inspection, and construction questions. ' },
+                environmental: { name: 'Environmental Health Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You are an Environmental Health expert. Answer health, hazmat, and water quality questions. ' },
+                fire: { name: 'Fire Department Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You are a Fire Department expert. Answer fire safety and defensible space questions. ' },
+                orchestrator: { name: 'Orchestrator', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You coordinate specialist agents. Select the minimal subset needed. ' },
+                statute_matching: { name: 'Statute Matching Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You match events to statutes and evaluate deadline math. Output: matches expected window | deviation detected | unable to determine. ' },
+                timeline: { name: 'Timeline Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You sequence events, compute elapsed time, and flag gaps. ' },
+                discrepancy: { name: 'Discrepancy Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You characterize conflicts between sources. You cite both sources. You do not resolve which is correct. ' },
+                fact_extraction: { name: 'Fact Extraction Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You extract dated facts, parties, and references from documents. ' },
+                document: { name: 'Document Agent', model: '@cf/meta/llama-3-8b-instruct', systemPrompt: 'You hash, classify, and route documents. ' }
+            },
+            JURISDICTION: {
+                humboldt: {
+                    code: 'HC',
+                    agencies: ['planning', 'building', 'environmental', 'fire'],
+                    statutes: ['HCC § 351-7', 'HCC § 351-12', 'CA Gov Code § 65852.2', 'HCC § 4.2']
+                }
+            }
+        };
+
+        // Append guardrail to every agent system prompt
+        Object.values(CONFIG.AGENTS).forEach(a => a.systemPrompt += CONFIG.GUARDRAIL);
+
+        const state = {
+            currentPage: 'assistant',
+            agentMode: false,
+            agentProgress: 0,
+            transcriptLines: [],
+            isPaused: false,
+            selectedJurisdiction: 'humboldt',
+            activeAgents: ['planning', 'building', 'environmental'],
+            conversationHistory: [],
+            caseContext: {
+                case_id: 'CE26-0402',
+                verified_facts: 14,
+                open_discrepancies: 3,
+                active_statutes: 5,
+                evidence_items: 8
+            }
+        };
+
+        const $ = (s) => document.querySelector(s);
+        const $$ = (s) => document.querySelectorAll(s);
+
+        // ===== Navigation =====
+        $$('.fp-nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const page = this.dataset.page;
+                if (!page) return;
+                if (state.agentMode) toggleAgentMode();
+                $$('.fp-nav-item').forEach(n => n.classList.remove('active'));
+                this.classList.add('active');
+                $$('.fp-page').forEach(p => p.classList.remove('active'));
+                const target = document.getElementById('page-' + page);
+                if (target) target.classList.add('active');
+                state.currentPage = page;
+            });
+        });
+
+        // ===== Global Search =====
+        const searchInput = document.getElementById('globalSearch');
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && this.value.trim()) {
+                sendChatMessage(this.value.trim());
+                this.value = '';
+            }
+        });
+
+        // ===== Chat =====
+        function sendChatMessage(msg) {
+            msg = msg || document.getElementById('chatInput').value.trim();
+            if (!msg) return;
+            document.getElementById('chatInput').value = '';
+
+            // Navigate to assistant page
+            $$('.fp-nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelector('.fp-nav-item[data-page="assistant"]').classList.add('active');
+            $$('.fp-page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-assistant').classList.add('active');
+
+            const chatArea = document.getElementById('chatArea');
+
+            // User message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'fp-chat-msg user';
+            userMsg.innerHTML = `<div class="fp-chat-bubble user">${msg}</div>`;
+            chatArea.appendChild(userMsg);
+
+            // Simulate agentGateway call
+            const agents = routeQuery(msg);
+            setTimeout(() => {
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'fp-chat-msg';
+                const response = generateResponse(msg, agents);
+                aiMsg.innerHTML = `
+                    <div class="fp-chat-avatar ai">FP</div>
+                    <div class="fp-chat-bubble ai">
+                        ${response.text}
+                        <div class="agents-tag">${agents.map(a => `<span class="fp-tag accent">${a}</span>`).join('')}</div>
+                    </div>
+                `;
+                chatArea.appendChild(aiMsg);
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }, 800);
+        }
+
+        document.getElementById('chatInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+
+        // ===== Tier 1 Routing (deterministic) =====
+        function routeQuery(query) {
+            const q = query.toLowerCase();
+            if (q.includes('compliant') || q.includes('deadline') || q.includes('on time') || q.includes('mailing'))
+                return ['timeline_agent', 'statute_matching_agent'];
+            if (q.includes('discrepanc') || q.includes('conflict') || q.includes('mismatch'))
+                return ['discrepancy_agent'];
+            if (q.includes('upload') || q.includes('document'))
+                return ['document_agent', 'fact_extraction_agent'];
+            if (q.includes('timeline') || q.includes('sequence') || q.includes('when'))
+                return ['timeline_agent'];
+            if (q.includes('statute') || q.includes('rule') || q.includes('code'))
+                return ['statute_matching_agent'];
+            // Tier 2 fallback
+            return ['orchestrator', 'statute_matching_agent', 'timeline_agent'];
+        }
+
+        function generateResponse(query, agents) {
+            const q = query.toLowerCase();
+            if (q.includes('compliant') || q.includes('deadline') || q.includes('mailing')) {
+                return { text: 'The citation in CE26-0402 was executed on Jul 15 and postmarked Jul 24 — a 9-day gap. HCC § 351-7 requires mailing within 3 business days. The statute_matching_agent labels this as <strong>"deviation detected"</strong> (not "non-compliant" — that would be a legal conclusion). The discrepancy_agent also flagged a conflict between the claimed mailing date (Jul 22) and the postmark (Jul 24).' };
+            }
+            if (q.includes('discrepanc') || q.includes('conflict')) {
+                return { text: 'I found 3 discrepancies in CE26-0402. The most significant: the citation document claims a mailing date of Jul 22, but the USPS postmark shows Jul 24. The discrepancy_agent has characterized this conflict but has not determined which date is accurate — that requires human review.' };
+            }
+            return { text: 'I\'ve routed your query to the relevant agents. Based on the current case context (CE26-0402), I can see 14 verified facts, 3 open discrepancies, and 5 active statutes. What specific aspect would you like me to analyze?' };
+        }
+
+        // ===== Agent Mode =====
+        const agentToggle = document.getElementById('agentToggle');
+        agentToggle.addEventListener('click', toggleAgentMode);
+
+        function toggleAgentMode() {
+            if (state.agentMode) {
+                state.agentMode = false;
+                state.isPaused = true;
+                document.getElementById('agentFrame').classList.remove('active');
+                document.getElementById('mainContent').classList.remove('agent-mode-active');
+                agentToggle.classList.remove('active');
+                agentToggle.querySelector('.dot').style.background = 'var(--text-quaternary)';
+                document.querySelector('.fp-nav-item[data-page="agent-mode"] .fp-nav-badge').textContent = 'Off';
+            } else {
+                startAgentMode();
+            }
+        }
+
+        function closeAgentFrame() {
+            document.getElementById('agentFrame').classList.remove('active');
+            document.getElementById('mainContent').classList.remove('agent-mode-active');
+        }
+
+        function startAgentMode() {
+            state.agentMode = true;
+            state.agentProgress = 0;
+            state.transcriptLines = [];
+            state.isPaused = false;
+
+            document.getElementById('agentFrame').classList.add('active');
+            document.getElementById('mainContent').classList.add('agent-mode-active');
+            agentToggle.classList.add('active');
+            agentToggle.querySelector('.dot').style.background = 'var(--accent)';
+            document.querySelector('.fp-nav-item[data-page="agent-mode"] .fp-nav-badge').textContent = 'Live';
+
+            document.getElementById('transcriptContainer').innerHTML = '';
+            runAgentWorkflow();
+        }
+
+        function stopAgentMode() {
+            state.agentMode = false;
+            state.isPaused = true;
+            document.getElementById('agentFrame').classList.remove('active');
+            document.getElementById('mainContent').classList.remove('agent-mode-active');
+            agentToggle.classList.remove('active');
+            agentToggle.querySelector('.dot').style.background = 'var(--text-quaternary)';
+            document.querySelector('.fp-nav-item[data-page="agent-mode"] .fp-nav-badge').textContent = 'Stopped';
+            addTranscriptLine('⏹', 'Agent mode stopped. Progress saved to ledger.', 'done', 'Orchestrator');
+        }
+
+        function simulateAgentStep() {
+            if (state.isPaused) {
+                state.isPaused = false;
+                runAgentWorkflow();
+            }
+        }
+
+        async function runAgentWorkflow() {
+            if (!state.agentMode || state.isPaused) return;
+
+            const steps = [
+                { icon: '📄', text: 'Document loaded: citation_CE26-0402.pdf', delay: 600, agent: 'document' },
+                { icon: '🔎', text: 'Extracting facts from citation...', delay: 800, agent: 'fact_extraction' },
+                { icon: '✅', text: 'Extracted 8 facts (dates, parties, references)', delay: 500, agent: 'fact_extraction' },
+                { icon: '📅', text: 'Sequencing events on timeline...', delay: 700, agent: 'timeline' },
+                { icon: '⚠️', text: 'Gap detected: 9 days between execution and postmark', delay: 600, agent: 'timeline' },
+                { icon: '⚖️', text: 'Matching against HCC § 351-7 (3-business-day window)...', delay: 900, agent: 'statute_matching' },
+                { icon: '🔍', text: 'Comparing citation mailing date vs postmark date...', delay: 700, agent: 'discrepancy' },
+                { icon: '🚫', text: 'Guardrail block: "non-compliant" → "deviation detected"', delay: 400, agent: 'statute_matching' },
+                { icon: '✅', text: 'CaseContext updated: 1 new discrepancy, 1 deviation flagged', delay: 500, agent: 'orchestrator' },
+                { icon: '📊', text: 'AgentRun records written to ledger (3 entries, SHA-256 hashed)', delay: 400, agent: 'orchestrator' },
+                { icon: '🎉', text: 'Analysis complete. Response ready for human review.', delay: 300, agent: 'orchestrator' }
+            ];
+
+            const totalSteps = steps.length;
+            let completed = 0;
+
+            for (const step of steps) {
+                if (!state.agentMode || state.isPaused) return;
+                await new Promise(resolve => setTimeout(resolve, step.delay));
+                const agent = CONFIG.AGENTS[step.agent];
+                addTranscriptLine(step.icon, step.text, 'done', agent.name);
+                completed++;
+                state.agentProgress = Math.round((completed / totalSteps) * 100);
+                updateAgentProgress();
+                updateAgentInsights(completed, totalSteps);
+            }
+
+            state.agentProgress = 100;
+            updateAgentProgress();
+            document.querySelector('.fp-agent-status .dot').style.background = 'var(--success)';
+            document.getElementById('progressSub').textContent = '🎉 Complete!';
+        }
+
+        function addTranscriptLine(icon, text, status, agent) {
+            const container = document.getElementById('transcriptContainer');
+            if (!container) return;
+            const line = document.createElement('div');
+            line.className = `fp-transcript-line ${status}`;
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const agentLabel = agent ? ` <span class="agent-label">${agent}</span>` : '';
+            line.innerHTML = `<span class="time">${time}</span><span class="icon">${icon}</span><span class="text">${text}${agentLabel}</span>`;
+            container.appendChild(line);
+            container.scrollTop = container.scrollHeight;
+            const count = container.querySelectorAll('.fp-transcript-line').length;
+            document.getElementById('transcriptHeader').textContent = `📝 Live Transcript (${count} events)`;
+        }
+
+        function updateAgentProgress() {
+            document.getElementById('agentProgressFill').style.width = `${state.agentProgress}%`;
+            document.getElementById('progressSub').textContent = `${state.agentProgress}% complete`;
+            document.getElementById('progressSteps').textContent = `📋 ${Math.round(state.agentProgress / 9.1)} of 11 steps`;
+            document.getElementById('progressTime').textContent = state.agentProgress < 100 ? `⏱ Est. ${Math.ceil((100 - state.agentProgress) * 0.5)}s remaining` : '⏱ Complete';
+        }
+
+        function updateAgentInsights(completed, total) {
+            const insights = document.getElementById('agentInsights');
+            const data = [
+                { label: '📅 Timeline', value: '9 days: execution → postmark', badge: 'danger', badgeText: 'Gap flagged' },
+                { label: '⚖️ Statute', value: 'HCC § 351-7 requires ≤ 3 business days', badge: 'danger', badgeText: 'Deviation' },
+                { label: '🔍 Discrepancy', value: 'Citation date vs postmark date conflict', badge: 'warning', badgeText: '2 sources' },
+                { label: '🛡️ Guardrail', value: '"non-compliant" blocked → "deviation detected"', badge: 'success', badgeText: 'Rewritten' }
+            ];
+            const showCount = Math.min(completed, data.length);
+            let html = '<div class="fp-agent-insights-header">💡 Live Insights</div>';
+            for (let i = 0; i < showCount; i++) {
+                const d = data[i];
+                html += `<div class="fp-agent-insight"><div class="label">${d.label}</div><div class="value">${d.value} <span class="badge ${d.badge}">${d.badgeText}</span></div></div>`;
+            }
+            insights.innerHTML = html;
+        }
+
+        // ===== Cloudflare AI API (stubs for production wiring) =====
+        async function callCloudflareAI(prompt, model) {
+            // PRODUCTION:
+            // const res = await fetch(`${CONFIG.AI_ENDPOINT}/infer`, {
+            //     method: 'POST', headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ prompt, model, max_tokens: CONFIG.MAX_TOKENS })
+            // });
+            // return await res.json();
+            console.log(`🧠 Cloudflare AI: ${model || CONFIG.DEFAULT_MODEL}`);
+            await new Promise(r => setTimeout(r, 300));
+            return { success: true, response: 'Simulated response', model: model || CONFIG.DEFAULT_MODEL };
+        }
+
+        async function agentGateway(caseId, pageContext, message, attachmentIds) {
+            // PRODUCTION: POST to CONFIG.API_BASE/agentGateway
+            // 1. Load CaseContext for caseId
+            // 2. Run orchestrator (Tier 1 rules → Tier 2 LLM)
+            // 3. Execute selected agents (parallel/sequential)
+            // 4. Merge outputs, update CaseContext
+            // 5. Write AgentRun per agent (SHA-256 hashed)
+            // 6. Return structured response
+            const agents = routeQuery(message);
+            return { response_text: 'Analysis complete', agents_used: agents, updated_fields: ['open_discrepancies'] };
+        }
+
+        async function queryKnowledgeGraph(query) {
+            // PRODUCTION: POST to CONFIG.VECTORIZE_ENDPOINT/search
+            console.log(`🌐 Vectorize: ${query}`);
+            await new Promise(r => setTimeout(r, 200));
+            return { success: true, results: [{ node: 'HCC § 351-7', relevance: 0.95 }] };
+        }
+
+        // ===== Keyboard Shortcuts =====
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                const input = document.getElementById('globalSearch');
+                if (input && input.value.trim()) { sendChatMessage(input.value.trim()); input.value = ''; }
+            }
+            if (e.key === 'Escape' && state.agentMode) stopAgentMode();
+            if (e.ctrlKey && e.shiftKey && e.key === 'A') { e.preventDefault(); toggleAgentMode(); }
+        });
+
+        // ===== Quick Actions =====
+        document.querySelectorAll('.fp-quick-item').forEach(item => {
+            item.addEventListener('click', function() {
+                sendChatMessage(this.textContent.trim());
+            });
+        });
+
+        // ===== Draw agent network edges =====
+        function drawGraphEdges() {
+            const svg = document.getElementById('graphSvg');
+            if (!svg) return;
+            const graph = document.getElementById('agentGraph');
+            const nodes = graph.querySelectorAll('.fp-graph-node');
+            const graphRect = graph.getBoundingClientRect();
+            // Clear existing edges
+            svg.innerHTML = `<defs><marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><polygon points="0 0, 6 3, 0 6" fill="#cbd5e1" /></marker></defs>`;
+            // Orchestrator → first row
+            const orch = nodes[0];
+            const orchRect = orch.getBoundingClientRect();
+            for (let i = 1; i <= 4; i++) {
+                const node = nodes[i];
+                const nodeRect = node.getBoundingClientRect();
+                const x1 = orchRect.left - graphRect.left + orchRect.width / 2;
+                const y1 = orchRect.bottom - graphRect.top;
+                const x2 = nodeRect.left - graphRect.left + nodeRect.width / 2;
+                const y2 = nodeRect.top - graphRect.top;
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                line.setAttribute('stroke', '#cbd5e1'); line.setAttribute('stroke-width', '1.5');
+                line.setAttribute('stroke-dasharray', '4 2');
+                svg.appendChild(line);
+            }
+            // First row → second row
+            for (let i = 1; i <= 4; i++) {
+                const top = nodes[i];
+                const topRect = top.getBoundingClientRect();
+                for (let j = 5; j <= 7; j++) {
+                    if ((i === 1 && j === 5) || (i === 2 && j === 6) || (i === 3 && j === 7) || (i === 4 && j === 6)) {
+                        const bot = nodes[j];
+                        const botRect = bot.getBoundingClientRect();
+                        const x1 = topRect.left - graphRect.left + topRect.width / 2;
+                        const y1 = topRect.bottom - graphRect.top;
+                        const x2 = botRect.left - graphRect.left + botRect.width / 2;
+                        const y2 = botRect.top - graphRect.top;
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                        line.setAttribute('stroke', '#cbd5e1'); line.setAttribute('stroke-width', '1.5');
+                        line.setAttribute('stroke-dasharray', '4 2');
+                        svg.appendChild(line);
+                    }
+                }
+            }
+            // Second row → third row
+            for (let i = 5; i <= 7; i++) {
+                const top = nodes[i];
+                if (!top) continue;
+                const topRect = top.getBoundingClientRect();
+                for (let j = 8; j <= 9; j++) {
+                    if ((i === 5 && j === 9) || (i === 6 && j === 8) || (i === 7 && j === 9)) {
+                        const bot = nodes[j];
+                        if (!bot) continue;
+                        const botRect = bot.getBoundingClientRect();
+                        const x1 = topRect.left - graphRect.left + topRect.width / 2;
+                        const y1 = topRect.bottom - graphRect.top;
+                        const x2 = botRect.left - graphRect.left + botRect.width / 2;
+                        const y2 = botRect.top - graphRect.top;
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                        line.setAttribute('stroke', '#cbd5e1'); line.setAttribute('stroke-width', '1.5');
+                        line.setAttribute('stroke-dasharray', '4 2');
+                        svg.appendChild(line);
+                    }
+                }
+            }
+        }
+
+        // Draw edges after layout settles
+        setTimeout(drawGraphEdges, 100);
+        window.addEventListener('resize', () => setTimeout(drawGraphEdges, 100));
+    </script>
+</body>
+</html>
