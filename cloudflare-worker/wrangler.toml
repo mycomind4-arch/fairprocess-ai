@@ -1,0 +1,15 @@
+name = "fairprocess-gateway"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fairprocess-db"
+database_id = "b24c562f-9c10-4c5f-a555-19ebb55996f7"
+
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "fairprocess-documents"
+
+[ai]
+binding = "AI"
