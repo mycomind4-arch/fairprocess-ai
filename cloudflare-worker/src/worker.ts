@@ -287,6 +287,56 @@ async function logInvocation(env, caseId, pageContext, message, agentsSelected) 
 }
 
 // ===== Main Worker =====
+
+// ===== Jurisdiction Statute Library =====
+// Extensible: add more counties/states here. Each entry auto-loads when a project is created.
+const JURISDICTION_STATUTES = {
+  "Humboldt": {
+    state: "CA",
+    statutes: [
+      { ref: "HCC § 351-7", description: "Citation shall be mailed within 3 business days of execution. Mailing date = postmark date.", deadline_type: "business_days", deadline_value: 3, deadline_direction: "max", category: "citation" },
+      { ref: "HCC § 351-12", description: "Notice published at least 10 days before hearing date.", deadline_type: "calendar_days", deadline_value: 10, deadline_direction: "min", category: "notice" },
+      { ref: "HCC § 4.2", description: "Notice posted and mailed within 5 business days of enforcement action.", deadline_type: "business_days", deadline_value: 5, deadline_direction: "max", category: "notice" },
+      { ref: "CA Gov Code § 65852.2", description: "Approve or disapprove ADU application within 60 days of complete application.", deadline_type: "calendar_days", deadline_value: 60, deadline_direction: "max", category: "zoning" },
+      { ref: "CA Gov Code § 65009", description: "Challenge to zoning decision must be filed within 90 days.", deadline_type: "calendar_days", deadline_value: 90, deadline_direction: "max", category: "zoning" },
+      { ref: "CA CCP § 1094.5", description: "Writ of mandate must be filed before proceeding becomes final (90 days).", deadline_type: "calendar_days", deadline_value: 90, deadline_direction: "max", category: "due_process" },
+      { ref: "14th Amendment § 1", description: "Due process — notice and opportunity to be heard.", deadline_type: "general", deadline_value: 0, deadline_direction: "min", category: "due_process" }
+    ]
+  },
+  "Los Angeles": {
+    state: "CA",
+    statutes: [
+      { ref: "LAMC § 91.0106", description: "Building permit issuance within 20 business days of complete application.", deadline_type: "business_days", deadline_value: 20, deadline_direction: "max", category: "permit" },
+      { ref: "LAMC § 12.22", description: "Public hearing notice at least 10 days before hearing date.", deadline_type: "calendar_days", deadline_value: 10, deadline_direction: "min", category: "notice" },
+      { ref: "CA Gov Code § 65852.2", description: "ADU application approval within 60 days.", deadline_type: "calendar_days", deadline_value: 60, deadline_direction: "max", category: "zoning" },
+      { ref: "CA Gov Code § 65009", description: "Challenge to zoning decision within 90 days.", deadline_type: "calendar_days", deadline_value: 90, deadline_direction: "max", category: "zoning" },
+      { ref: "CA CCP § 1094.5", description: "Writ of mandate within 90 days.", deadline_type: "calendar_days", deadline_value: 90, deadline_direction: "max", category: "due_process" },
+      { ref: "14th Amendment § 1", description: "Due process — notice and opportunity to be heard.", deadline_type: "general", deadline_value: 0, deadline_direction: "min", category: "due_process" }
+    ]
+  },
+  "default": {
+    state: "CA",
+    statutes: [
+      { ref: "CA Gov Code § 65852.2", description: "ADU application approval within 60 days.", deadline_type: "calendar_days", deadline_value: 60, deadline_direction: "max", category: "zoning" },
+      { ref: "CA Gov Code § 65009", description: "Challenge to zoning decision within 90 days.", deadline_type: "calendar_days", deadline_value: 90, deadline_direction: "max", category: "zoning" },
+      { ref: "CA CCP § 1094.5", description: "Writ of mandate within 90 days.", deadline_type: "calendar_days", deadline_value: 90, deadline_direction: "max", category: "due_process" },
+      { ref: "14th Amendment § 1", description: "Due process — notice and opportunity to be heard.", deadline_type: "general", deadline_value: 0, deadline_direction: "min", category: "due_process" }
+    ]
+  }
+};
+
+async function loadJurisdictionStatutes(env, projectId, county, state) {
+  const key = JURISDICTION_STATUTES[county] ? county : "default";
+  const lib = JURISDICTION_STATUTES[key];
+  const statutes = lib.statutes;
+  for (const s of statutes) {
+    await env.DB.prepare(
+      "INSERT INTO project_statutes (id, project_id, ref, description, deadline_type, deadline_value, deadline_direction, category, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(crypto.randomUUID(), projectId, s.ref, s.description, s.deadline_type, s.deadline_value, s.deadline_direction, s.category, "jurisdiction_library").run();
+  }
+  return statutes.length;
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -345,6 +395,206 @@ export default {
         return corsResponse(JSON.stringify({ message: "Demo case seeded", case_id: caseId, facts: facts.length, discrepancies: discrepancies.length }), { headers: { "Content-Type": "application/json" } });
       } catch (e) {
         return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+    }
+
+    // ===== Project Routes =====
+    // GET /projects — list all
+    if (path === "/projects" && request.method === "GET") {
+      try {
+        const projects = await env.DB.prepare("SELECT * FROM projects ORDER BY created_date DESC").all();
+        const result = [];
+        for (const p of projects.results) {
+          const sc = await env.DB.prepare("SELECT COUNT(*) as c FROM project_statutes WHERE project_id = ?").bind(p.id).first();
+          const dc = await env.DB.prepare("SELECT COUNT(*) as c FROM project_documents WHERE project_id = ?").bind(p.id).first();
+          const ec = await env.DB.prepare("SELECT COUNT(*) as c FROM project_evidence WHERE project_id = ?").bind(p.id).first();
+          result.push({ ...p, statute_count: sc.c, document_count: dc.c, evidence_count: ec.c });
+        }
+        return corsResponse(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
+      } catch (e) {
+        return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+    }
+
+    // POST /projects — create
+    if (path === "/projects" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const { name, description, jurisdiction_county, jurisdiction_state } = body;
+        if (!name) return corsResponse(JSON.stringify({ error: "name is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        const id = crypto.randomUUID();
+        await env.DB.prepare(
+          "INSERT INTO projects (id, name, description, jurisdiction_county, jurisdiction_state, status) VALUES (?, ?, ?, ?, ?, 'active')"
+        ).bind(id, name, description || "", jurisdiction_county || "Humboldt", jurisdiction_state || "CA").run();
+        const count = await loadJurisdictionStatutes(env, id, jurisdiction_county || "Humboldt", jurisdiction_state || "CA");
+        return corsResponse(JSON.stringify({ id, name, statutes_loaded: count }), { headers: { "Content-Type": "application/json" } });
+      } catch (e) {
+        return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+    }
+
+    // Routes with /projects/:id pattern
+    const projMatch = path.match(/^\/projects\/([a-f0-9-]+)(\/.*)?$/);
+    if (projMatch) {
+      const projectId = projMatch[1];
+      const subPath = projMatch[2] || "";
+
+      // GET /projects/:id — get one project
+      if (subPath === "" && request.method === "GET") {
+        try {
+          const project = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(projectId).first();
+          if (!project) return corsResponse(JSON.stringify({ error: "Project not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+          const statutes = await env.DB.prepare("SELECT * FROM project_statutes WHERE project_id = ? ORDER BY created_date").bind(projectId).all();
+          const documents = await env.DB.prepare("SELECT id, project_id, name, doc_type, source, mime_type, size_bytes, processing_status, evidence_extracted, uploaded_date FROM project_documents WHERE project_id = ? ORDER BY uploaded_date DESC").bind(projectId).all();
+          const evidence = await env.DB.prepare("SELECT * FROM project_evidence WHERE project_id = ? ORDER BY created_date DESC").bind(projectId).all();
+          const ec = await env.DB.prepare("SELECT COUNT(*) as c FROM project_evidence WHERE project_id = ?").bind(projectId).first();
+          return corsResponse(JSON.stringify({ ...project, statutes: statutes.results, documents: documents.results, evidence: evidence.results, evidence_count: ec.c }), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // PUT /projects/:id — update
+      if (subPath === "" && request.method === "PUT") {
+        try {
+          const body = await request.json();
+          const { name, description, status, jurisdiction_county } = body;
+          if (jurisdiction_county) {
+            // Jurisdiction changed — reload statutes
+            await env.DB.prepare("DELETE FROM project_statutes WHERE project_id = ?").bind(projectId).run();
+            await loadJurisdictionStatutes(env, projectId, jurisdiction_county, body.jurisdiction_state || "CA");
+          }
+          await env.DB.prepare(
+            "UPDATE projects SET name = COALESCE(?, name), description = COALESCE(?, description), status = COALESCE(?, status), updated_date = datetime('now') WHERE id = ?"
+          ).bind(name || null, description || null, status || null, projectId).run();
+          return corsResponse(JSON.stringify({ message: "Project updated" }), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // DELETE /projects/:id
+      if (subPath === "" && request.method === "DELETE") {
+        try {
+          await env.DB.prepare("DELETE FROM project_evidence WHERE project_id = ?").bind(projectId).run();
+          await env.DB.prepare("DELETE FROM project_documents WHERE project_id = ?").bind(projectId).run();
+          await env.DB.prepare("DELETE FROM project_statutes WHERE project_id = ?").bind(projectId).run();
+          await env.DB.prepare("DELETE FROM projects WHERE id = ?").bind(projectId).run();
+          return corsResponse(JSON.stringify({ message: "Project deleted" }), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // GET /projects/:id/statutes
+      if (subPath === "/statutes" && request.method === "GET") {
+        try {
+          const statutes = await env.DB.prepare("SELECT * FROM project_statutes WHERE project_id = ? ORDER BY created_date").bind(projectId).all();
+          return corsResponse(JSON.stringify(statutes.results), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // POST /projects/:id/statutes — add statute
+      if (subPath === "/statutes" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { ref, description, deadline_type, deadline_value, deadline_direction, category } = body;
+          const id = crypto.randomUUID();
+          await env.DB.prepare(
+            "INSERT INTO project_statutes (id, project_id, ref, description, deadline_type, deadline_value, deadline_direction, category, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual')"
+          ).bind(id, projectId, ref, description, deadline_type || "calendar_days", deadline_value || 0, deadline_direction || "max", category || "general").run();
+          return corsResponse(JSON.stringify({ id, message: "Statute added" }), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // GET /projects/:id/documents
+      if (subPath === "/documents" && request.method === "GET") {
+        try {
+          const docs = await env.DB.prepare("SELECT id, project_id, name, doc_type, source, mime_type, size_bytes, processing_status, evidence_extracted, uploaded_date FROM project_documents WHERE project_id = ? ORDER BY uploaded_date DESC").bind(projectId).all();
+          return corsResponse(JSON.stringify(docs.results), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // POST /projects/:id/documents — add document metadata
+      if (subPath === "/documents" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { name, doc_type, source, r2_key, mime_type, size_bytes } = body;
+          const id = crypto.randomUUID();
+          await env.DB.prepare(
+            "INSERT INTO project_documents (id, project_id, name, doc_type, source, r2_key, mime_type, size_bytes, processing_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')"
+          ).bind(id, projectId, name, doc_type || "upload", source || "upload", r2_key || null, mime_type || null, size_bytes || 0).run();
+          return corsResponse(JSON.stringify({ id, message: "Document added" }), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // GET /projects/:id/evidence
+      if (subPath === "/evidence" && request.method === "GET") {
+        try {
+          const evidence = await env.DB.prepare(
+            "SELECT e.*, d.name as source_doc_name FROM project_evidence e LEFT JOIN project_documents d ON e.document_id = d.id WHERE e.project_id = ? ORDER BY e.created_date DESC"
+          ).bind(projectId).all();
+          return corsResponse(JSON.stringify(evidence.results), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // POST /projects/:id/evidence — add evidence item
+      if (subPath === "/evidence" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { document_id, evidence_type, title, extracted_text, facts_json, confidence, date_referenced, source_doc_name, chain_of_custody } = body;
+          const id = crypto.randomUUID();
+          await env.DB.prepare(
+            "INSERT INTO project_evidence (id, project_id, document_id, evidence_type, title, extracted_text, facts_json, confidence, date_referenced, source_doc_name, chain_of_custody) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          ).bind(id, projectId, document_id || null, evidence_type || "document", title || null, extracted_text || null, facts_json || null, confidence || 0.0, date_referenced || null, source_doc_name || null, chain_of_custody || null).run();
+          return corsResponse(JSON.stringify({ id, message: "Evidence added" }), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // POST /projects/:id/export — generate attorney-ready case file
+      if (subPath === "/export" && request.method === "POST") {
+        try {
+          const project = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(projectId).first();
+          const statutes = await env.DB.prepare("SELECT * FROM project_statutes WHERE project_id = ?").bind(projectId).all();
+          const documents = await env.DB.prepare("SELECT id, name, doc_type, source, mime_type, size_bytes, processing_status, evidence_extracted, uploaded_date FROM project_documents WHERE project_id = ?").bind(projectId).all();
+          const evidence = await env.DB.prepare("SELECT * FROM project_evidence WHERE project_id = ?").bind(projectId).all();
+          const ledger = await env.DB.prepare("SELECT * FROM agent_runs WHERE case_id = ? ORDER BY created_date DESC").bind(projectId).all();
+          const caseCtx = await getCaseContext(env, projectId);
+
+          const exportPackage = {
+            project: project,
+            jurisdiction: { county: project.jurisdiction_county, state: project.jurisdiction_state },
+            statutes: statutes.results,
+            documents: documents.results,
+            evidence: evidence.results,
+            timeline: caseCtx?.verified_facts || [],
+            discrepancies: caseCtx?.open_discrepancies || [],
+            audit_ledger: ledger.results,
+            generated_at: new Date().toISOString(),
+            summary: {
+              total_statutes: statutes.results.length,
+              total_documents: documents.results.length,
+              total_evidence: evidence.results.length,
+              total_ledger_entries: ledger.results.length,
+              open_discrepancies: (caseCtx?.open_discrepancies || []).length
+            }
+          };
+          return corsResponse(JSON.stringify(exportPackage), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
       }
     }
 
@@ -461,7 +711,7 @@ export default {
 
     return corsResponse(JSON.stringify({
       error: "Not found",
-      endpoints: ["/", "/gateway", "/ledger?case_id=X", "/case?case_id=X", "/seed"]
+      endpoints: ["/", "/projects", "/projects/:id", "/projects/:id/statutes", "/projects/:id/documents", "/projects/:id/evidence", "/projects/:id/export", "/gateway", "/ledger?case_id=X", "/case?case_id=X", "/seed"]
     }), { status: 404, headers: { "Content-Type": "application/json" } });
   }
 };
