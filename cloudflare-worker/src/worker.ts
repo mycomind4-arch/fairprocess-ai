@@ -40,6 +40,22 @@ function uuid() {
   return crypto.randomUUID();
 }
 
+// ===== CORS =====
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400"
+};
+
+function corsResponse(body, init) {
+  const headers = new Headers(init?.headers || {});
+  for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
+  return new Response(body, { ...init, headers });
+}
+
+
+
 // ===== Cloudflare Workers AI =====
 const CF_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
@@ -273,11 +289,14 @@ async function logInvocation(env, caseId, pageContext, message, agentsSelected) 
 // ===== Main Worker =====
 export default {
   async fetch(request, env) {
+    if (request.method === "OPTIONS") {
+      return corsResponse(null, { status: 204 });
+    }
     const url = new URL(request.url);
     const path = url.pathname;
 
     if (path === "/" || path === "/health") {
-      return new Response(JSON.stringify({
+      return corsResponse(JSON.stringify({
         service: "FairProcess V3 Gateway",
         status: "operational",
         model: CF_MODEL,
@@ -288,24 +307,24 @@ export default {
 
     if (path === "/ledger" && request.method === "GET") {
       const caseId = url.searchParams.get("case_id");
-      if (!caseId) return new Response(JSON.stringify({ error: "case_id required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      if (!caseId) return corsResponse(JSON.stringify({ error: "case_id required" }), { status: 400, headers: { "Content-Type": "application/json" } });
       const result = await env.DB.prepare("SELECT * FROM agent_runs WHERE case_id = ? ORDER BY created_date DESC").bind(caseId).all();
-      return new Response(JSON.stringify({ case_id: caseId, entries: result.results.length, ledger: result.results }, null, 2), { headers: { "Content-Type": "application/json" } });
+      return corsResponse(JSON.stringify({ case_id: caseId, entries: result.results.length, ledger: result.results }, null, 2), { headers: { "Content-Type": "application/json" } });
     }
 
     if (path === "/case" && request.method === "GET") {
       const caseId = url.searchParams.get("case_id");
-      if (!caseId) return new Response(JSON.stringify({ error: "case_id required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      if (!caseId) return corsResponse(JSON.stringify({ error: "case_id required" }), { status: 400, headers: { "Content-Type": "application/json" } });
       const ctx = await getCaseContext(env, caseId);
-      if (!ctx) return new Response(JSON.stringify({ error: "Case not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
-      return new Response(JSON.stringify(ctx, null, 2), { headers: { "Content-Type": "application/json" } });
+      if (!ctx) return corsResponse(JSON.stringify({ error: "Case not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      return corsResponse(JSON.stringify(ctx, null, 2), { headers: { "Content-Type": "application/json" } });
     }
 
     if (path === "/seed" && request.method === "POST") {
       try {
         const caseId = "CE26-0402";
         const existing = await getCaseContext(env, caseId);
-        if (existing) return new Response(JSON.stringify({ message: "Case already seeded", case_id: caseId }), { headers: { "Content-Type": "application/json" } });
+        if (existing) return corsResponse(JSON.stringify({ message: "Case already seeded", case_id: caseId }), { headers: { "Content-Type": "application/json" } });
 
         const facts = [
           { fact_id: "f_001", text: "Citation executed on Jul 15, 2026", source_doc: "citation_CE26-0402.pdf", date: "2026-07-15", confidence: 0.98 },
@@ -323,19 +342,19 @@ export default {
           active_statutes: ["HCC \u00a7 351-7", "HCC \u00a7 351-12"], last_updated_by_agent: "seed"
         });
 
-        return new Response(JSON.stringify({ message: "Demo case seeded", case_id: caseId, facts: facts.length, discrepancies: discrepancies.length }), { headers: { "Content-Type": "application/json" } });
+        return corsResponse(JSON.stringify({ message: "Demo case seeded", case_id: caseId, facts: facts.length, discrepancies: discrepancies.length }), { headers: { "Content-Type": "application/json" } });
       } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
     }
 
     if (path === "/gateway" || path === "/agentGateway") {
-      if (request.method !== "POST") return new Response(JSON.stringify({ error: "POST required" }), { status: 405, headers: { "Content-Type": "application/json" } });
+      if (request.method !== "POST") return corsResponse(JSON.stringify({ error: "POST required" }), { status: 405, headers: { "Content-Type": "application/json" } });
 
       try {
         const body = await request.json();
         const { case_id, page_context, message, document_text, document_name } = body;
-        if (!case_id) return new Response(JSON.stringify({ error: "case_id is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        if (!case_id) return corsResponse(JSON.stringify({ error: "case_id is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
 
         const startedAt = new Date().toISOString();
 
@@ -422,7 +441,7 @@ export default {
           ledgerEntries.push({ agent: result.agent_name, hash: hash.substring(0, 12), status: result.status, guardrail_blocks: result.guardrail_blocks || [] });
         }
 
-        return new Response(JSON.stringify({
+        return corsResponse(JSON.stringify({
           response_text: responseText,
           agents_used: routing.agents,
           updated_fields: [...new Set(updatedFields)],
@@ -436,11 +455,11 @@ export default {
           guardrail: GUARDRAIL
         }), { headers: { "Content-Type": "application/json" } });
       } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        return corsResponse(JSON.stringify({ error: err.message }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
     }
 
-    return new Response(JSON.stringify({
+    return corsResponse(JSON.stringify({
       error: "Not found",
       endpoints: ["/", "/gateway", "/ledger?case_id=X", "/case?case_id=X", "/seed"]
     }), { status: 404, headers: { "Content-Type": "application/json" } });
