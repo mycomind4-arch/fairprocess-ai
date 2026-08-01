@@ -3547,7 +3547,7 @@
                             <div class="fp-project-card-stat"><div class="num">${p.evidence_count || 0}</div><div class="label">Evidence</div></div>
                         </div>
                     </div>
-                `);
+                `).join('');
             } catch (e) {
                 console.error('loadProjects error:', e);
                 document.getElementById('projectsGrid').innerHTML = '<div style="text-align:center;padding:48px;color:var(--danger);grid-column:1/-1;"><div style="font-size:32px;margin-bottom:8px;">⚠️</div><p style="font-size:14px;">Failed to load projects. Retrying...</p></div>';
@@ -3669,11 +3669,12 @@
                     ${s.category ? `<span class="fp-statute-cat">${s.category}</span>` : ''}
                     ${s.deadline_value > 0 ? `<div class="fp-statute-deadline">${s.deadline_value} ${s.deadline_type === 'business_days' ? 'biz days' : 'days'} ${s.deadline_direction}</div>` : ''}
                 </div>
-            `).join('');
+            `).join('').join('');
         }
 
         function renderDocuments(documents) {
-            const container = document.getElementById('pwDocList');
+            const container = document.getElementById('pwDocUpload');
+            if (!container) return;
             if (!documents || documents.length === 0) {
                 container.innerHTML = '<p style="font-size:13px;color:var(--text-tertiary);padding:12px 0;">No documents uploaded yet. Upload documents to begin evidence extraction.</p>';
                 return;
@@ -3695,7 +3696,7 @@
                         </div>
                     </div>
                 `;
-            }).join('');
+            }).join('').join('');
         }
 
         function renderEvidence(evidence) {
@@ -3723,7 +3724,7 @@
                         </div>
                     </div>
                 `;
-            }).join('');
+            }).join('').join('');
         }
 
         // ===== New Project Modal =====
@@ -3903,7 +3904,7 @@
                         </div>
                         <div class="fp-ledger-hash" style="font-family:monospace;font-size:10px;color:var(--text-quaternary);background:var(--surface-strong);padding:2px 8px;border-radius:4px;">${(e.ledger_hash || '').substring(0, 12)}</div>
                     </div>
-                `).join('');
+                `).join('').join('');
             } catch (e) { console.error('Ledger load error:', e); }
         }
 
@@ -3928,7 +3929,7 @@
                             <div class="fp-chain-meta">${ev.date} · ${ev.source_doc || 'unknown'} · ${ev.status || 'verified'}</div>
                         </div>
                     </div>
-                `).join('');
+                `).join('').join('');
             } catch (e) { console.error('Timeline load error:', e); }
         }
 
@@ -3958,7 +3959,7 @@
                             ${d.source_b ? `<span>📄 ${d.source_b.doc || ''}</span>` : ''}
                         </div>
                     </div>
-                `).join('');
+                `).join('').join('');
             } catch (e) { console.error('Discrepancies load error:', e); }
         }
 
@@ -4030,7 +4031,7 @@
                         </div>
                     </div>
                 `;
-            }).join('');
+            }).join('').join('');
         }
 
         async function startRecordsSync() {
@@ -4112,7 +4113,7 @@
                                 </div>
                             </div>
                         `;
-                    }).join('');
+                    }).join('').join('');
                 } else {
                     resultsSection.style.display = 'none';
                 }
@@ -4141,7 +4142,7 @@
                             <span>${new Date(s.created_date).toLocaleDateString()}</span>
                         </div>
                     </div>`;
-                }).join('');
+                }).join('').join('');
                 // Attach click handlers after render
                 container.querySelectorAll('.fp-records-history-item').forEach(item => {
                     item.addEventListener('click', () => {
@@ -4226,7 +4227,7 @@
                             '<span class="fp-audit-finding-tag ' + (f.tag || 'discrepancy') + '">' + (f.tag || 'discrepancy') + '</span></div>' +
                             '<div class="fp-audit-finding-detail">' + (f.detail || '') + '</div>' +
                             '</div></div>'
-                        ).join('');
+                        ).join('').join('');
                     }
                 }
                 // Evidence
@@ -4241,7 +4242,7 @@
                             '<div style="font-size:12px;color:var(--text-tertiary);">Source: ' + (e.source_doc_name || 'unknown') + ' • Confidence: ' + ((e.confidence || 0) * 100).toFixed(0) + '%</div>' +
                             (e.extracted_text ? '<div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;">' + (e.extracted_text.length > 200 ? e.extracted_text.substring(0, 200) + '...' : e.extracted_text) + '</div>' : '') +
                             '</div>'
-                        ).join('');
+                        ).join('').join('');
                     }
                 }
                 // Timeline
@@ -4257,7 +4258,7 @@
                             '<div style="font-size:13px;flex:1;">' + (e.event || '') + '</div>' +
                             '<div style="font-size:11px;color:var(--text-tertiary);">' + (e.status || '') + '</div>' +
                             '</div>'
-                        ).join('');
+                        ).join('').join('');
                     }
                 }
                 // Applicable Rules
@@ -4272,7 +4273,7 @@
                             '<div style="font-size:12px;color:var(--text-tertiary);">' + (r.description || '') + '</div>' +
                             '<div style="font-size:11px;color:var(--text-quaternary);margin-top:2px;">' + (r.deadline_direction || 'max') + ' ' + (r.deadline_value || 0) + ' ' + (r.deadline_type || 'days') + ' • ' + (r.source || 'manual') + '</div>' +
                             '</div>'
-                        ).join('');
+                        ).join('').join('');
                     }
                 }
                 // AI Analysis
@@ -4286,7 +4287,7 @@
                             '<div style="font-size:13px;font-weight:500;">' + (a.agent || 'Agent') + ' <span style="font-size:11px;color:var(--text-tertiary);font-weight:400;">' + (a.timestamp || '') + '</span></div>' +
                             '<div style="font-size:12px;color:var(--text-tertiary);">Status: ' + (a.status || 'unknown') + (a.hash ? ' • Hash: ' + a.hash : '') + '</div>' +
                             '</div>'
-                        ).join('');
+                        ).join('').join('');
                     }
                 }
                 // Human Decisions
@@ -4300,7 +4301,7 @@
                             '<div style="font-size:13px;">' + (d.decision_text || '') + '</div>' +
                             '<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">' + (d.performed_by || 'unknown') + ' • ' + (d.created_date || '') + '</div>' +
                             '</div>'
-                        ).join('');
+                        ).join('').join('');
                     }
                 }
                 // Appendices
@@ -4314,7 +4315,7 @@
                             '<div style="font-size:13px;font-weight:500;">' + (d.name || 'Document') + '</div>' +
                             '<div style="font-size:11px;color:var(--text-tertiary);">' + (d.doc_type || 'upload') + ' • ' + (d.processing_status || 'pending') + ' • ' + (d.uploaded_date || '') + '</div>' +
                             '</div>'
-                        ).join('');
+                        ).join('').join('');
                     }
                 }
             } catch (e) {
@@ -4384,7 +4385,7 @@
                             '<div style="flex:1;"><div style="font-size:13px;font-weight:500;">' + a.name + '</div>' +
                             '<div style="font-size:11px;color:var(--text-tertiary);">' + a.runs + ' runs \u2022 ' + a.successes + ' success \u2022 ' + a.errors + ' errors</div></div>' +
                             statusBadge + '</div>';
-                    }).join('');
+                    }).join('').join('');
                 }
             } catch (e) {
                 console.error('loadAgentSwarm error:', e);
