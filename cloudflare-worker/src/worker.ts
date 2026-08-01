@@ -1116,6 +1116,93 @@ export default {
         }
       }
 
+      // POST /projects/:id/records/import — import records sync results as project evidence
+      if (subPath.match(/^\/records\/import$/) && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { search_id } = body;
+          if (!search_id) return corsResponse(JSON.stringify({ error: "search_id is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+
+          // Get the records sync results
+          const search = await env.DB.prepare("SELECT * FROM property_searches WHERE id = ?").bind(search_id).first();
+          if (!search) return corsResponse(JSON.stringify({ error: "Search not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+
+          const records = await env.DB.prepare("SELECT * FROM property_records WHERE search_id = ?").bind(search_id).all();
+
+          // Create a document record for the sync (so evidence has a source)
+          const syncDocId = crypto.randomUUID();
+          await env.DB.prepare(
+            "INSERT INTO project_documents (id, project_id, name, doc_type, source, mime_type, size_bytes, processing_status, evidence_extracted) VALUES (?, ?, ?, 'scrape', 'records_sync', null, 0, 'imported', 1)"
+          ).bind(syncDocId, projectId, `Records Sync: ${search.address || search.apn || search_id.substring(0, 8)}`).run();
+
+          let imported = 0;
+          for (const r of records.results) {
+            const eid = crypto.randomUUID();
+            const factsJson = r.data_json || "{}";
+            let parsedData = {};
+            try { parsedData = JSON.parse(r.data_json); } catch (e) {}
+
+            await env.DB.prepare(
+              "INSERT INTO project_evidence (id, project_id, document_id, evidence_type, title, extracted_text, facts_json, confidence, date_referenced, source_doc_name, chain_of_custody) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            ).bind(
+              eid, projectId, syncDocId,
+              r.record_type || "record",
+              r.title || `${r.record_type} from ${r.source}`,
+              JSON.stringify(parsedData),
+              factsJson,
+              r.confidence || 0.5,
+              r.date_filed || null,
+              `Records Sync Agent: ${r.source}`,
+              `Scraped from ${r.source_url || 'public records'} on ${new Date().toISOString().split('T')[0]} → Imported as evidence`
+            ).run();
+            imported++;
+          }
+
+          // Update case context
+          const allEvidence = await env.DB.prepare("SELECT * FROM project_evidence WHERE project_id = ?").bind(projectId).all();
+          const factsForContext = allEvidence.results.map(e => ({
+            fact_id: e.id,
+            text: e.extracted_text || e.title || "",
+            source_doc: e.source_doc_name || "records sync",
+            date: e.date_referenced || "",
+            confidence: e.confidence || 0
+          }));
+          await upsertCaseContext(env, null, {
+            case_id: projectId,
+            verified_facts: factsForContext,
+            last_updated_by_agent: "records_import"
+          });
+
+          // Log to audit ledger
+          const ledgerText = JSON.stringify({ case_id: projectId, agent_name: "Records Import", search_id, records_imported: imported });
+          let hash = "unavailable";
+          try { hash = await sha256(ledgerText); } catch (e) {}
+          await logAgentRun(env, projectId, "Records Import Pipeline", "success", { search_id, records_imported: imported, source_address: search.address }, new Date().toISOString(), new Date().toISOString(), hash);
+
+          return corsResponse(JSON.stringify({
+            imported: imported,
+            document_id: syncDocId,
+            search_id: search_id,
+            ledger_hash: hash.substring(0, 12),
+            message: `${imported} records imported as project evidence`
+          }), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // GET /projects/:id/records/syncs — list sync jobs for this project
+      if (subPath.match(/^\/records\/syncs$/) && request.method === "GET") {
+        try {
+          const searches = await env.DB.prepare(
+            "SELECT * FROM property_searches WHERE project_id = ? ORDER BY created_date DESC"
+          ).bind(projectId).all();
+          return corsResponse(JSON.stringify(searches.results), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
       // POST /projects/:id/export — generate attorney-ready case file
       if (subPath === "/export" && request.method === "POST") {
         try {
