@@ -991,7 +991,13 @@
                     </div>
 
                     <div id="recordsResultsSection" style="display:none;">
-                        <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text-secondary);">Found Records</h3>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                            <h3 style="font-size:14px;font-weight:600;color:var(--text-secondary);">Found Records</h3>
+                            <button id="importToProjectBtn" style="display:none;background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:none;align-items:center;gap:6px;" title="Import these records as structured evidence into the active project">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Import to Project Evidence
+                            </button>
+                        </div>
                         <div class="fp-records-results" id="recordsResults"></div>
                     </div>
 
@@ -3514,6 +3520,7 @@
         };
 
         let recordsAgents = [];
+        let currentSyncSearchId = null;
         let activeSyncId = null;
 
         async function loadRecordsAgents() {
@@ -3582,7 +3589,7 @@
             document.getElementById('recordsResultsSection').style.display = 'none';
 
             try {
-                const result = await apiCall('/records/sync', 'POST', { address, county, state: 'CA' });
+                const result = await apiCall('/records/sync', 'POST', { address, county, state: 'CA', project_id: projectId });
                 activeSyncId = result.search_id;
 
                 // Fetch the full results
@@ -3598,7 +3605,14 @@
 
         async function loadSyncResults(syncId) {
             try {
+                currentSyncSearchId = syncId;
                 const data = await apiCall('/records/sync/' + syncId, 'GET');
+
+                // Show import button if we have an active project
+                const importBtn = document.getElementById('importToProjectBtn');
+                if (importBtn) {
+                    importBtn.style.display = activeProjectId ? 'flex' : 'none';
+                }
 
                 // Render agent statuses
                 renderRecordsAgents(data.agents, 'running');
@@ -3683,6 +3697,33 @@
         }
 
         document.getElementById('recordsSyncBtn').addEventListener('click', startRecordsSync);
+
+        // Import to Project Evidence
+        const importBtn = document.getElementById('importToProjectBtn');
+        if (importBtn) {
+            importBtn.addEventListener('click', async () => {
+                if (!currentSyncSearchId || !activeProjectId) {
+                    alert('Open a project first, then run a records sync to import results.');
+                    return;
+                }
+                importBtn.disabled = true;
+                importBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="animation:fp-spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke-dasharray="40" stroke-dashoffset="10"/></svg> Importing...';
+                try {
+                    const result = await apiCall('/projects/' + activeProjectId + '/records/import', 'POST', { search_id: currentSyncSearchId });
+                    importBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ' + result.imported + ' Records Imported';
+                    importBtn.style.background = 'var(--success)';
+                    // Reload project data to show new evidence
+                    await openProject(activeProjectId);
+                } catch (e) {
+                    importBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Import Failed';
+                    importBtn.style.background = 'var(--danger)';
+                    console.error('Import error:', e);
+                    setTimeout(() => { importBtn.style.display = 'none'; }, 3000);
+                }
+                importBtn.disabled = false;
+            });
+        }
+        
         document.getElementById('recordsAddressInput').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') startRecordsSync();
         });
