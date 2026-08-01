@@ -1091,12 +1091,12 @@ export default {
     if (path === "/projects" && request.method === "POST") {
       try {
         const body = await request.json();
-        const { name, description, jurisdiction_county, jurisdiction_state } = body;
+        const { name, description, jurisdiction_county, jurisdiction_state, address, apn, owner_name, latitude, longitude } = body;
         if (!name) return corsResponse(JSON.stringify({ error: "name is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
         const id = crypto.randomUUID();
         await env.DB.prepare(
-          "INSERT INTO projects (id, name, description, jurisdiction_county, jurisdiction_state, status) VALUES (?, ?, ?, ?, ?, 'active')"
-        ).bind(id, name, description || "", jurisdiction_county || "Humboldt", jurisdiction_state || "CA").run();
+          "INSERT INTO projects (id, name, description, jurisdiction_county, jurisdiction_state, status, address, apn, owner_name, latitude, longitude) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)"
+        ).bind(id, name, description || "", jurisdiction_county || "Humboldt", jurisdiction_state || "CA", address || null, apn || null, owner_name || null, latitude || null, longitude || null).run();
         const count = await loadJurisdictionStatutes(env, id, jurisdiction_county || "Humboldt", jurisdiction_state || "CA");
         return corsResponse(JSON.stringify({ id, name, statutes_loaded: count }), { headers: { "Content-Type": "application/json" } });
       } catch (e) {
@@ -1517,12 +1517,10 @@ export default {
           return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
         }
       }
-    }
-
+    
 
       // ===== V4 Routes =====
-
-      // GET /projects/:id/audit-report — assemble full audit report
+// GET /projects/:id/audit-report — assemble full audit report
       if (subPath === "/audit-report" && request.method === "GET") {
         try {
           const report = await assembleAuditReport(env, projectId);
@@ -1584,6 +1582,31 @@ export default {
           return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
         }
       }
+      
+      // GET /projects/:id/ownership — ownership history
+      if (subPath === "/ownership" && request.method === "GET") {
+        try {
+          const records = await env.DB.prepare(
+            "SELECT * FROM ownership_history WHERE project_id = ? ORDER BY transfer_date ASC"
+          ).bind(projectId).all();
+          return corsResponse(JSON.stringify(records.results || []), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // GET /projects/:id/code-enforcement — code enforcement cases
+      if (subPath === "/code-enforcement" && request.method === "GET") {
+        try {
+          const records = await env.DB.prepare(
+            "SELECT * FROM code_enforcement_cases WHERE project_id = ? ORDER BY filed_date DESC"
+          ).bind(projectId).all();
+          return corsResponse(JSON.stringify(records.results || []), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+    }
 
     // ===== Records Sync Routes =====
     // GET /records/agents — list available records agents

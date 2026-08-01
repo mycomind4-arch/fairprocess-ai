@@ -472,7 +472,62 @@
            ================================================================ */
         .fp-projects-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
         .fp-projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-        .fp-project-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; cursor: pointer; transition: all var(--transition); position: relative; overflow: hidden; }
+        
+        
+        /* Ownership Timeline */
+        .fp-timeline { display:flex;align-items:flex-start;overflow-x:auto;padding:12px 0;gap:0; }
+        .fp-timeline-item { flex-shrink:0;display:flex;flex-direction:column;align-items:center;min-width:140px;position:relative; }
+        .fp-timeline-dot { width:14px;height:14px;border-radius:50%;background:var(--accent);border:3px solid var(--surface);box-shadow:0 0 0 2px var(--accent);margin-bottom:8px;z-index:1; }
+        .fp-timeline-dot.unverified { background:#f59e0b;box-shadow:0 0 0 2px #f59e0b; }
+        .fp-timeline-line { position:absolute;top:7px;left:50%;width:100%;height:2px;background:var(--border);z-index:0; }
+        .fp-timeline-item:last-child .fp-timeline-line { display:none; }
+        .fp-timeline-date { font-size:11px;font-weight:600;color:var(--accent);margin-bottom:2px; }
+        .fp-timeline-name { font-size:13px;font-weight:600;color:var(--text-primary);text-align:center; }
+        .fp-timeline-type { font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-quaternary);margin-top:2px; }
+        .fp-timeline-type.unverified { color:#f59e0b; }
+
+        /* Code Enforcement Cards */
+        .fp-ce-card { display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer;transition:all var(--transition); }
+        .fp-ce-card:hover { border-color:var(--accent);background:var(--accent-light,var(--accent-bg,rgba(99,102,241,0.05))); }
+        .fp-ce-card-left { display:flex;align-items:center;gap:12px; }
+        .fp-ce-card-icon { width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0; }
+        .fp-ce-card-icon.open { background:rgba(239,68,68,0.1);color:#ef4444; }
+        .fp-ce-card-icon.closed { background:rgba(34,197,94,0.1);color:#22c55e; }
+        .fp-ce-card-info { display:flex;flex-direction:column;gap:2px; }
+        .fp-ce-card-number { font-size:14px;font-weight:600;color:var(--text-primary); }
+        .fp-ce-card-desc { font-size:12px;color:var(--text-tertiary);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+        .fp-ce-card-dates { font-size:11px;color:var(--text-quaternary); }
+        .fp-ce-card-right { display:flex;align-items:center;gap:8px; }
+        .fp-verified-badge { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px; }
+        .fp-verified-badge.verified { background:rgba(34,197,94,0.1);color:#22c55e; }
+        .fp-verified-badge.unverified { background:rgba(245,158,11,0.1);color:#f59e0b; }
+        .fp-verified-badge svg { width:12px;height:12px; }
+
+
+/* Satellite Project Cards */
+        .fp-sat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all var(--transition); overflow: hidden; position: relative; }
+        .fp-sat-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+        .fp-sat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); opacity: 0; transition: opacity var(--transition); z-index: 1000; }
+        .fp-sat-card:hover::before { opacity: 1; }
+        .fp-sat-map { width: 100%; height: 200px; background: #1a1a2e; position: relative; }
+        .fp-sat-map .leaflet-container { background: #1a1a2e !important; }
+        .fp-sat-status { position: absolute; top: 12px; right: 12px; z-index: 1000; }
+        .fp-sat-info { padding: 16px 18px; }
+        .fp-sat-address { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+        .fp-sat-meta { display: flex; flex-direction: column; gap: 4px; }
+        .fp-sat-meta-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-tertiary); }
+        .fp-sat-meta-label { font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; color: var(--text-quaternary); width: 50px; }
+        .fp-sat-meta-value { color: var(--text-secondary); }
+        .fp-sat-stats { display: flex; gap: 12px; padding: 10px 18px; border-top: 1px solid var(--border); }
+        .fp-sat-stat { display: flex; gap: 4px; align-items: center; }
+        .fp-sat-stat-num { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+        .fp-sat-stat-label { font-size: 10px; color: var(--text-quaternary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .fp-sat-no-map { width: 100%; height: 200px; background: linear-gradient(135deg, #1a1a2e, #16213e); display: flex; align-items: center; justify-content: center; color: var(--text-quaternary); font-size: 13px; }
+        .fp-sat-no-map svg { width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.4; }
+        .fp-sat-loading { width: 100%; height: 200px; background: #1a1a2e; display: flex; align-items: center; justify-content: center; color: var(--text-quaternary); font-size: 13px; }
+
+
+.fp-project-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; cursor: pointer; transition: all var(--transition); position: relative; overflow: hidden; }
         .fp-project-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); transform: translateY(-1px); }
         .fp-project-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); opacity: 0; transition: opacity var(--transition); }
         .fp-project-card:hover::before { opacity: 1; }
@@ -849,6 +904,11 @@
         .fp-modal-overlay.active { display: flex; }
 
         </style>
+
+    <!-- Leaflet for satellite imagery -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 </head>
 <body>
     <div class="fp-app">
@@ -1089,17 +1149,79 @@
                         </div>
                     </div>
                     <h1 class="fp-page-title">Overview</h1>
-                    <p class="fp-page-subtitle">Project dashboard with stats, description, and permissions.</p>
+                    <p class="fp-page-subtitle">Property intelligence dashboard — satellite view, ownership chain, and code enforcement history.</p>
+
+                    <!-- Satellite View + Property Info -->
+                    <div class="fp-panel" style="padding:0;overflow:hidden;">
+                        <div id="pwOverviewMap" style="width:100%;height:320px;background:#1a1a2e;"></div>
+                        <div style="padding:20px;">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <span style="font-size:16px;font-weight:600;color:var(--text-primary);" id="pwOvAddress">—</span>
+                                <span id="pwOvVerifiedBadge"></span>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+                                <div>
+                                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-quaternary);margin-bottom:4px;">APN</div>
+                                    <div style="font-size:14px;font-weight:600;color:var(--text-primary);" id="pwOvApn">—</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-quaternary);margin-bottom:4px;">Current Owner</div>
+                                    <div style="font-size:14px;font-weight:600;color:var(--text-primary);" id="pwOvOwner">—</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-quaternary);margin-bottom:4px;">Jurisdiction</div>
+                                    <div style="font-size:14px;font-weight:600;color:var(--text-primary);" id="pwOvCounty">—</div>
+                                </div>
+                            </div>
+                            <div id="pwOvNoData" style="display:none;margin-top:16px;padding:12px 16px;background:var(--warning-bg,rgba(245,158,11,0.1));border:1px solid var(--warning-border,rgba(245,158,11,0.3));border-radius:8px;font-size:13px;color:var(--text-secondary);">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:6px;color:#f59e0b;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                No AI-scraped data yet. Fields entered manually are <strong>not verified</strong>. Run a Public Records scan to auto-populate and verify.
+                                <button onclick="navigateToPwPage('public-signals')" style="margin-left:8px;color:var(--accent);text-decoration:underline;background:none;border:none;cursor:pointer;font-size:13px;">Go to Public Signals →</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ownership Timeline -->
+                    <div class="fp-panel">
+                        <div class="fp-panel-header">
+                            <div class="fp-panel-title">Ownership Timeline</div>
+                            <span id="pwOvOwnershipCount" style="font-size:12px;color:var(--text-tertiary);"></span>
+                        </div>
+                        <div id="pwOvOwnership" style="padding:8px 0;">
+                            <p style="font-size:13px;color:var(--text-tertiary);">Loading ownership history…</p>
+                        </div>
+                    </div>
+
+                    <!-- Code Enforcement Cases -->
+                    <div class="fp-panel">
+                        <div class="fp-panel-header">
+                            <div class="fp-panel-title">Code Enforcement Cases</div>
+                            <span id="pwOvCeCount" style="font-size:12px;color:var(--text-tertiary);"></span>
+                        </div>
+                        <div id="pwOvCodeEnforcement" style="padding:8px 0;">
+                            <p style="font-size:13px;color:var(--text-tertiary);">Loading code enforcement cases…</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats + Public Records Link -->
                     <div class="fp-grid-4" id="pwOverviewStats">
                         <div class="fp-stat"><div class="fp-stat-label">Statutes</div><div class="fp-stat-value" id="pwStatStatutes">0</div></div>
                         <div class="fp-stat"><div class="fp-stat-label">Documents</div><div class="fp-stat-value" id="pwStatDocs">0</div></div>
                         <div class="fp-stat"><div class="fp-stat-label">Evidence Items</div><div class="fp-stat-value" id="pwStatEvidence">0</div></div>
                         <div class="fp-stat"><div class="fp-stat-label">Discrepancies</div><div class="fp-stat-value" id="pwStatDiscrepancies">0</div></div>
                     </div>
-                    <div class="fp-panel">
-                        <div class="fp-panel-header"><div class="fp-panel-title">Project Description</div></div>
-                        <p id="pwDescription" style="font-size:14px;color:var(--text-secondary);line-height:1.6;">—</p>
+
+                    <!-- Public Records Link -->
+                    <div class="fp-panel" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="navigateToPwPage('public-signals')">
+                        <div>
+                            <div style="font-size:14px;font-weight:600;color:var(--text-primary);">AI-Scraped Public Records</div>
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-top:2px;">Scan county assessor, code enforcement, court records, and tax records to auto-populate this overview.</div>
+                        </div>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex-shrink:0;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                     </div>
+
+                    <!-- Jurisdiction Law Library (collapsed) -->
                     <div class="fp-panel">
                         <div class="fp-panel-header"><div class="fp-panel-title">Jurisdiction Law Library</div></div>
                         <p style="font-size:13px;color:var(--text-tertiary);margin-bottom:12px;">All statute compliance checks within this project use these laws as the source of truth.</p>
@@ -1577,6 +1699,20 @@
                             <label>Description</label>
                             <textarea id="npDesc" placeholder="Brief description of the case or project..."></textarea>
                         </div>
+                        
+                        <div class="fp-modal-field">
+                            <label>Property Address</label>
+                            <input type="text" id="npAddress" placeholder="e.g. 123 Main St, Eureka, CA 95501">
+                        </div>
+                        <div class="fp-modal-field">
+                            <label>APN (Assessor Parcel Number)</label>
+                            <input type="text" id="npApn" placeholder="e.g. 003-104-011">
+                        </div>
+                        <div class="fp-modal-field">
+                            <label>Current Owner</label>
+                            <input type="text" id="npOwner" placeholder="e.g. John Smith">
+                        </div>
+
                         <div class="fp-modal-field">
                             <label>County Jurisdiction</label>
                             <select id="npCounty">
@@ -3532,27 +3668,80 @@
                     return;
                 }
 
-                grid.innerHTML = projects.map(p => `
-                    <div class="fp-project-card" onclick="openProject('${p.id}')">
-                        <div class="fp-project-card-status"><span class="fp-tag ${p.status === 'active' ? 'success' : ''}">${p.status || 'active'}</span></div>
-                        <div class="fp-project-card-header">
-                            <div class="fp-project-card-icon">⚖️</div>
+                // Render satellite cards
+                grid.innerHTML = projects.map((p, i) => `
+                    <div class="fp-sat-card" onclick="openProject('${p.id}')">
+                        <div class="fp-sat-status"><span class="fp-tag ${p.status === 'active' ? 'success' : ''}">${p.status || 'active'}</span></div>
+                        <div class="fp-sat-map" id="satMap-${i}"></div>
+                        <div class="fp-sat-info">
+                            <div class="fp-sat-address">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                ${p.address || p.name}
+                            </div>
+                            <div class="fp-sat-meta">
+                                <div class="fp-sat-meta-row"><span class="fp-sat-meta-label">APN</span><span class="fp-sat-meta-value">${p.apn || '—'}</span></div>
+                                <div class="fp-sat-meta-row"><span class="fp-sat-meta-label">Owner</span><span class="fp-sat-meta-value">${p.owner_name || '—'}</span></div>
+                            </div>
                         </div>
-                        <div class="fp-project-card-title">${p.name}</div>
-                        <div class="fp-project-card-county">🏛️ ${p.jurisdiction_county} County, ${p.jurisdiction_state}</div>
-                        <div class="fp-project-card-desc">${p.description || 'No description'}</div>
-                        <div class="fp-project-card-stats">
-                            <div class="fp-project-card-stat"><div class="num">${p.statute_count || 0}</div><div class="label">Statutes</div></div>
-                            <div class="fp-project-card-stat"><div class="num">${p.document_count || 0}</div><div class="label">Documents</div></div>
-                            <div class="fp-project-card-stat"><div class="num">${p.evidence_count || 0}</div><div class="label">Evidence</div></div>
+                        <div class="fp-sat-stats">
+                            <div class="fp-sat-stat"><span class="fp-sat-stat-num">${p.statute_count || 0}</span><span class="fp-sat-stat-label">Statutes</span></div>
+                            <div class="fp-sat-stat"><span class="fp-sat-stat-num">${p.document_count || 0}</span><span class="fp-sat-stat-label">Docs</span></div>
+                            <div class="fp-sat-stat"><span class="fp-sat-stat-num">${p.evidence_count || 0}</span><span class="fp-sat-stat-label">Evidence</span></div>
                         </div>
                     </div>
                 `).join('');
+
+                // Initialize Leaflet satellite maps for each card
+                projects.forEach((p, i) => {
+                    initSatMap(i, p.latitude, p.longitude);
+                });
             } catch (e) {
                 console.error('loadProjects error:', e);
                 document.getElementById('projectsGrid').innerHTML = '<div style="text-align:center;padding:48px;color:var(--danger);grid-column:1/-1;"><div style="font-size:32px;margin-bottom:8px;">⚠️</div><p style="font-size:14px;">Failed to load projects. Retrying...</p></div>';
-                setTimeout(loadProjects, 3000); // Auto-retry once
+                setTimeout(loadProjects, 3000);
             }
+        }
+
+        // Initialize satellite map for a project card
+        const satMaps = [];
+        function initSatMap(idx, lat, lng) {
+            const containerId = 'satMap-' + idx;
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            if (!lat || !lng) {
+                container.innerHTML = '<div class="fp-sat-no-map"><div style="text-align:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><div>No coordinates</div></div></div>';
+                return;
+            }
+
+            const map = L.map(containerId, {
+                zoomControl: false,
+                attributionControl: false,
+                dragging: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                touchZoom: false,
+                keyboard: false,
+                fadeAnimation: false,
+                zoomAnimation: false
+            }).setView([lat, lng], 18);
+
+            // Esri World Imagery (free satellite tiles, no API key)
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19
+            }).addTo(map);
+
+            // Draw red outline around the property (approximate parcel rectangle)
+            const offset = 0.0005; // ~50 meters
+            const bounds = [[lat - offset, lng - offset], [lat + offset, lng + offset]];
+            L.rectangle(bounds, {
+                color: '#ef4444',
+                weight: 3,
+                fillColor: '#ef4444',
+                fillOpacity: 0.1
+            }).addTo(map);
+
+            satMaps[idx] = map;
         }
 
         async function openProject(id) {
@@ -3579,6 +3768,13 @@
 
                 // Overview statutes
                 renderStatutes(data.statutes || [], 'pwOverviewStatutes');
+
+                // Render satellite map + property info on overview
+                renderOverviewProperty(data);
+
+                // Fetch and render ownership timeline + code enforcement
+                loadOwnershipHistory(id);
+                loadCodeEnforcement(id);
                 renderStatutes(data.statutes || [], 'pwStatuteList');
 
                 // Documents
@@ -3745,11 +3941,33 @@
                 btn.textContent = 'Creating...';
                 btn.disabled = true;
 
-                await apiCall('/projects', 'POST', { name, description: desc, jurisdiction_county: county, jurisdiction_state: state });
+                const address = document.getElementById('npAddress').value.trim();
+                const apn = document.getElementById('npApn').value.trim();
+                const owner = document.getElementById('npOwner').value.trim();
+
+                // Geocode the address to get lat/lng
+                let lat = null, lng = null;
+                if (address) {
+                    try {
+                        const geoResp = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(address) + '&format=json&limit=1', {
+                            headers: { 'User-Agent': 'FairProcess/1.0' }
+                        });
+                        const geoData = await geoResp.json();
+                        if (geoData.length > 0) {
+                            lat = parseFloat(geoData[0].lat);
+                            lng = parseFloat(geoData[0].lon);
+                        }
+                    } catch (geoErr) { console.warn('Geocoding failed:', geoErr); }
+                }
+
+                await apiCall('/projects', 'POST', { name, description: desc, jurisdiction_county: county, jurisdiction_state: state, address, apn, owner_name: owner, latitude: lat, longitude: lng });
 
                 newProjectModal.classList.remove('active');
                 document.getElementById('npName').value = '';
                 document.getElementById('npDesc').value = '';
+                document.getElementById('npAddress').value = '';
+                document.getElementById('npApn').value = '';
+                document.getElementById('npOwner').value = '';
                 btn.textContent = 'Create Project';
                 btn.disabled = false;
 
@@ -4405,6 +4623,157 @@
             if (!activeProjectId) return;
             alert('Share report coming soon');
         });
+
+
+        // Overview: render satellite map and property info
+        let overviewMap = null;
+        function renderOverviewProperty(data) {
+            const addr = document.getElementById('pwOvAddress');
+            const apn = document.getElementById('pwOvApn');
+            const owner = document.getElementById('pwOvOwner');
+            const county = document.getElementById('pwOvCounty');
+            const verifiedBadge = document.getElementById('pwOvVerifiedBadge');
+            const noDataBanner = document.getElementById('pwOvNoData');
+
+            addr.textContent = data.address || data.name || '—';
+            apn.textContent = data.apn || '—';
+            owner.textContent = data.owner_name || '—';
+            county.textContent = (data.jurisdiction_county || '—') + ' County, ' + (data.jurisdiction_state || 'CA');
+
+            // Verified / not-verified badge
+            const isVerified = data.data_source === 'ai_scraped';
+            verifiedBadge.innerHTML = isVerified
+                ? '<span class="fp-verified-badge verified"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Verified</span>'
+                : '<span class="fp-verified-badge unverified"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Not Verified</span>';
+
+            // Show "no data" banner if manually entered
+            if (!isVerified) {
+                noDataBanner.style.display = 'block';
+            } else {
+                noDataBanner.style.display = 'none';
+            }
+
+            // Initialize satellite map
+            if (overviewMap) { overviewMap.remove(); overviewMap = null; }
+            const mapContainer = document.getElementById('pwOverviewMap');
+            if (data.latitude && data.longitude) {
+                overviewMap = L.map(mapContainer, {
+                    zoomControl: true,
+                    attributionControl: false
+                }).setView([data.latitude, data.longitude], 18);
+
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 19
+                }).addTo(overviewMap);
+
+                // Red property outline
+                const offset = 0.0005;
+                const bounds = [[data.latitude - offset, data.longitude - offset], [data.latitude + offset, data.longitude + offset]];
+                L.rectangle(bounds, {
+                    color: '#ef4444',
+                    weight: 3,
+                    fillColor: '#ef4444',
+                    fillOpacity: 0.1
+                }).addTo(overviewMap);
+
+                // Label with address
+                L.marker([data.latitude, data.longitude], {
+                    icon: L.divIcon({ html: '<div style="background:rgba(0,0,0,0.7);color:white;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap;">' + (data.address || data.name) + '</div>', className: '', iconSize: [200, 30], iconAnchor: [100, 15] })
+                }).addTo(overviewMap);
+            } else {
+                mapContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-quaternary);font-size:14px;">No coordinates available — enter property address to geocode</div>';
+            }
+        }
+
+        // Load ownership history for overview
+        async function loadOwnershipHistory(projectId) {
+            try {
+                const records = await apiCall('/projects/' + projectId + '/ownership', 'GET');
+                const container = document.getElementById('pwOvOwnership');
+                const countBadge = document.getElementById('pwOvOwnershipCount');
+
+                if (!records || records.length === 0) {
+                    container.innerHTML = '<p style="font-size:13px;color:var(--text-tertiary);">No ownership records yet. Run a Public Records scan or enter manually.</p>';
+                    countBadge.textContent = '';
+                    return;
+                }
+
+                countBadge.textContent = records.length + ' record' + (records.length !== 1 ? 's' : '');
+                container.innerHTML = '<div class="fp-timeline">' + records.map(r => {
+                    const verified = r.verified === 1;
+                    return '<div class="fp-timeline-item">' +
+                        '<div class="fp-timeline-line"></div>' +
+                        '<div class="fp-timeline-dot ' + (verified ? '' : 'unverified') + '"></div>' +
+                        '<div class="fp-timeline-date">' + (r.transfer_date || '—') + '</div>' +
+                        '<div class="fp-timeline-name">' + (r.owner_name || '—') + '</div>' +
+                        '<div class="fp-timeline-type ' + (verified ? '' : 'unverified') + '">' + (r.transfer_type || 'transfer') + (verified ? '' : ' ⚠') + '</div>' +
+                    '</div>';
+                }).join('') + '</div>';
+            } catch (e) {
+                console.error('loadOwnershipHistory error:', e);
+                document.getElementById('pwOvOwnership').innerHTML = '<p style="font-size:13px;color:var(--text-tertiary);">Unable to load ownership history.</p>';
+            }
+        }
+
+        // Load code enforcement cases for overview
+        async function loadCodeEnforcement(projectId) {
+            try {
+                const records = await apiCall('/projects/' + projectId + '/code-enforcement', 'GET');
+                const container = document.getElementById('pwOvCodeEnforcement');
+                const countBadge = document.getElementById('pwOvCeCount');
+
+                if (!records || records.length === 0) {
+                    container.innerHTML = '<p style="font-size:13px;color:var(--text-tertiary);">No code enforcement cases found.</p>';
+                    countBadge.textContent = '';
+                    return;
+                }
+
+                const openCount = records.filter(r => r.status === 'open').length;
+                countBadge.textContent = openCount + ' open / ' + (records.length - openCount) + ' closed';
+
+                container.innerHTML = records.map(r => {
+                    const verified = r.verified === 1;
+                    const isOpen = r.status === 'open';
+                    return '<div class="fp-ce-card" onclick="navigateToPwPage('evidence')" style="cursor:pointer;">' +
+                        '<div class="fp-ce-card-left">' +
+                            '<div class="fp-ce-card-icon ' + r.status + '">' +
+                                (isOpen
+                                    ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+                                    : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+                                ) +
+                            '</div>' +
+                            '<div class="fp-ce-card-info">' +
+                                '<div class="fp-ce-card-number">' + (r.case_number || '—') + '</div>' +
+                                '<div class="fp-ce-card-desc">' + (r.description || '') + '</div>' +
+                                '<div class="fp-ce-card-dates">Filed: ' + (r.filed_date || '—') + (r.closed_date ? ' | Closed: ' + r.closed_date : '') + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="fp-ce-card-right">' +
+                            '<span class="fp-tag ' + (isOpen ? 'danger' : 'success') + '">' + r.status + '</span>' +
+                            (verified
+                                ? '<span class="fp-verified-badge verified"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>'
+                                : '<span class="fp-verified-badge unverified"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>'
+                            ) +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+            } catch (e) {
+                console.error('loadCodeEnforcement error:', e);
+                document.getElementById('pwOvCodeEnforcement').innerHTML = '<p style="font-size:13px;color:var(--text-tertiary);">Unable to load code enforcement cases.</p>';
+            }
+        }
+
+        // Navigate to a project workspace page
+        function navigateToPwPage(pageName) {
+            document.querySelectorAll('.fp-pw-page').forEach(p => p.classList.remove('active'));
+            const target = document.getElementById('page-pw-' + pageName);
+            if (target) target.classList.add('active');
+            document.querySelectorAll('#navModeProject .fp-nav-item').forEach(n => n.classList.remove('active'));
+            const navItem = document.querySelector('#navModeProject .fp-nav-item[data-pw-page="' + pageName + '"]');
+            if (navItem) navItem.classList.add('active');
+            state.currentPage = 'pw-' + pageName;
+        }
+
 
 </script>
 </body>
