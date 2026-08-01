@@ -3624,6 +3624,9 @@
             if (pageName === 'ledger' && activeProjectId) loadProjectLedger();
             if (pageName === 'timeline' && activeProjectId) loadProjectTimeline();
             if (pageName === 'discrepancies' && activeProjectId) loadProjectDiscrepancies();
+            if (pageName === 'audit-report' && activeProjectId) loadAuditReport(activeProjectId);
+            if (pageName === 'agent-swarm' && activeProjectId) loadAgentSwarm(activeProjectId);
+            if (pageName === 'overview' && activeProjectId) loadPermissions(activeProjectId);
         }
 
         document.querySelectorAll('#navModeProject .fp-nav-item').forEach(item => {
@@ -4191,6 +4194,217 @@
         try { loadRecordsHistory(); } catch(e) { console.error('Init loadRecordsHistory:', e); }
         setTimeout(drawGraphEdges, 100);
         window.addEventListener('resize', () => setTimeout(drawGraphEdges, 100));
-    </script>
+    
+        // ===== V4: Audit Report =====
+        async function loadAuditReport(projectId) {
+            try {
+                const report = await apiCall('/projects/' + projectId + '/audit-report', 'GET');
+                // Summary
+                const summaryEl = document.getElementById('pwAuditSummary');
+                if (summaryEl && report.summary) {
+                    summaryEl.innerHTML = '<div style="margin-bottom:12px;"><strong>' + (report.summary.project_name || '') + '</strong></div>' +
+                        '<div>' + (report.summary.description || '') + '</div>' +
+                        '<div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--text-tertiary);">' +
+                        '<span>📄 ' + (report.summary.total_documents || 0) + ' documents</span>' +
+                        '<span>📁 ' + (report.summary.total_evidence || 0) + ' evidence items</span>' +
+                        '<span>⚡ ' + (report.summary.total_discrepancies || 0) + ' discrepancies</span>' +
+                        '<span>⚖️ ' + (report.summary.total_statutes || 0) + ' statutes</span>' +
+                        '<span>🤖 ' + (report.summary.total_agent_runs || 0) + ' agent runs</span>' +
+                        '</div>';
+                }
+                // Findings
+                const findingsEl = document.getElementById('pwAuditFindings');
+                if (findingsEl && report.findings) {
+                    if (report.findings.length === 0) {
+                        findingsEl.innerHTML = '<div class="fp-audit-placeholder">No findings recorded. Run agent analysis to generate findings.</div>';
+                    } else {
+                        findingsEl.innerHTML = report.findings.map(f =>
+                            '<div class="fp-audit-finding">' +
+                            '<div class="fp-audit-finding-num">' + f.number + '</div>' +
+                            '<div class="fp-audit-finding-body">' +
+                            '<div class="fp-audit-finding-title">' + (f.title || 'Finding') +
+                            '<span class="fp-audit-finding-tag ' + (f.tag || 'discrepancy') + '">' + (f.tag || 'discrepancy') + '</span></div>' +
+                            '<div class="fp-audit-finding-detail">' + (f.detail || '') + '</div>' +
+                            '</div></div>'
+                        ).join('');
+                    }
+                }
+                // Evidence
+                const evidenceEl = document.getElementById('pwAuditEvidence');
+                if (evidenceEl && report.evidence) {
+                    if (report.evidence.length === 0) {
+                        evidenceEl.innerHTML = '<div class="fp-audit-placeholder">No evidence items collected.</div>';
+                    } else {
+                        evidenceEl.innerHTML = report.evidence.map(e =>
+                            '<div style="padding:8px 0;border-bottom:1px solid var(--surface-strong);">' +
+                            '<div style="font-size:13px;font-weight:500;">' + (e.title || e.evidence_type || 'Evidence') + '</div>' +
+                            '<div style="font-size:12px;color:var(--text-tertiary);">Source: ' + (e.source_doc_name || 'unknown') + ' • Confidence: ' + ((e.confidence || 0) * 100).toFixed(0) + '%</div>' +
+                            (e.extracted_text ? '<div style="font-size:12px;color:var(--text-tertiary);margin-top:4px;">' + (e.extracted_text.length > 200 ? e.extracted_text.substring(0, 200) + '...' : e.extracted_text) + '</div>' : '') +
+                            '</div>'
+                        ).join('');
+                    }
+                }
+                // Timeline
+                const timelineEl = document.getElementById('pwAuditTimeline');
+                if (timelineEl && report.timeline) {
+                    const events = report.timeline.events || [];
+                    if (events.length === 0) {
+                        timelineEl.innerHTML = '<div class="fp-audit-placeholder">No timeline events recorded.</div>';
+                    } else {
+                        timelineEl.innerHTML = events.map(e =>
+                            '<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--surface-strong);">' +
+                            '<div style="font-size:12px;font-weight:600;min-width:100px;color:var(--accent);">' + (e.date || '') + '</div>' +
+                            '<div style="font-size:13px;flex:1;">' + (e.event || '') + '</div>' +
+                            '<div style="font-size:11px;color:var(--text-tertiary);">' + (e.status || '') + '</div>' +
+                            '</div>'
+                        ).join('');
+                    }
+                }
+                // Applicable Rules
+                const rulesEl = document.getElementById('pwAuditRules');
+                if (rulesEl && report.applicable_rules) {
+                    if (report.applicable_rules.length === 0) {
+                        rulesEl.innerHTML = '<div class="fp-audit-placeholder">No statutes configured for this project.</div>';
+                    } else {
+                        rulesEl.innerHTML = report.applicable_rules.map(r =>
+                            '<div style="padding:8px 0;border-bottom:1px solid var(--surface-strong);">' +
+                            '<div style="font-size:13px;font-weight:600;">' + (r.ref || '') + '</div>' +
+                            '<div style="font-size:12px;color:var(--text-tertiary);">' + (r.description || '') + '</div>' +
+                            '<div style="font-size:11px;color:var(--text-quaternary);margin-top:2px;">' + (r.deadline_direction || 'max') + ' ' + (r.deadline_value || 0) + ' ' + (r.deadline_type || 'days') + ' • ' + (r.source || 'manual') + '</div>' +
+                            '</div>'
+                        ).join('');
+                    }
+                }
+                // AI Analysis
+                const aiEl = document.getElementById('pwAuditAI');
+                if (aiEl && report.ai_analysis) {
+                    if (report.ai_analysis.length === 0) {
+                        aiEl.innerHTML = '<div class="fp-audit-placeholder">No agent analysis runs yet. Run the agent swarm to generate analysis.</div>';
+                    } else {
+                        aiEl.innerHTML = report.ai_analysis.map(a =>
+                            '<div style="padding:8px 0;border-bottom:1px solid var(--surface-strong);">' +
+                            '<div style="font-size:13px;font-weight:500;">' + (a.agent || 'Agent') + ' <span style="font-size:11px;color:var(--text-tertiary);font-weight:400;">' + (a.timestamp || '') + '</span></div>' +
+                            '<div style="font-size:12px;color:var(--text-tertiary);">Status: ' + (a.status || 'unknown') + (a.hash ? ' • Hash: ' + a.hash : '') + '</div>' +
+                            '</div>'
+                        ).join('');
+                    }
+                }
+                // Human Decisions
+                const humanEl = document.getElementById('pwAuditHuman');
+                if (humanEl && report.human_decisions) {
+                    if (report.human_decisions.length === 0) {
+                        humanEl.innerHTML = '<div class="fp-audit-placeholder">No human decisions recorded yet.</div>';
+                    } else {
+                        humanEl.innerHTML = report.human_decisions.map(d =>
+                            '<div style="padding:8px 0;border-bottom:1px solid var(--surface-strong);">' +
+                            '<div style="font-size:13px;">' + (d.decision_text || '') + '</div>' +
+                            '<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">' + (d.performed_by || 'unknown') + ' • ' + (d.created_date || '') + '</div>' +
+                            '</div>'
+                        ).join('');
+                    }
+                }
+                // Appendices
+                const appendicesEl = document.getElementById('pwAuditAppendices');
+                if (appendicesEl && report.appendices) {
+                    if (report.appendices.length === 0) {
+                        appendicesEl.innerHTML = '<div class="fp-audit-placeholder">No supporting documents.</div>';
+                    } else {
+                        appendicesEl.innerHTML = report.appendices.map(d =>
+                            '<div style="padding:8px 0;border-bottom:1px solid var(--surface-strong);">' +
+                            '<div style="font-size:13px;font-weight:500;">' + (d.name || 'Document') + '</div>' +
+                            '<div style="font-size:11px;color:var(--text-tertiary);">' + (d.doc_type || 'upload') + ' • ' + (d.processing_status || 'pending') + ' • ' + (d.uploaded_date || '') + '</div>' +
+                            '</div>'
+                        ).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('loadAuditReport error:', e);
+            }
+        }
+
+        // ===== V4: Permissions =====
+        async function loadPermissions(projectId) {
+            try {
+                const perms = await apiCall('/projects/' + projectId + '/permissions', 'GET');
+                const log = await apiCall('/projects/' + projectId + '/sharing-log', 'GET');
+
+                // Update permission rows
+                const permRows = document.querySelectorAll('.fp-permissions-row');
+                if (permRows.length >= 5 && perms.roles) {
+                    permRows[0].querySelector('.fp-permissions-count').textContent = perms.roles.owner.count;
+                    permRows[1].querySelector('.fp-permissions-count').textContent = perms.roles.editors.count;
+                    permRows[2].querySelector('.fp-permissions-count').textContent = perms.roles.viewers.count;
+                    permRows[3].querySelector('.fp-permissions-count').textContent = perms.roles.outside_counsel.count;
+                    if (perms.roles.outside_counsel.count > 0) {
+                        permRows[3].querySelector('.fp-permissions-status').className = 'fp-permissions-status active';
+                        permRows[3].querySelector('.fp-permissions-status').textContent = 'Active';
+                    }
+                    if (perms.roles.public_link?.enabled) {
+                        permRows[4].querySelector('.fp-permissions-status').className = 'fp-permissions-status active';
+                        permRows[4].querySelector('.fp-permissions-status').textContent = 'Enabled';
+                    }
+                }
+
+                // Update sharing log
+                const logEl = document.querySelector('.fp-permissions-log');
+                if (logEl && Array.isArray(log) && log.length > 0) {
+                    const logTitle = logEl.querySelector('.fp-permissions-log-title');
+                    const logHtml = log.map(l =>
+                        '<div class="fp-permissions-log-item">' +
+                        (l.created_date ? l.created_date.substring(0, 16).replace('T', ' ') : '') +
+                        ' \u2014 ' + (l.details || l.action + ' ' + (l.user_email || '')) +
+                        '</div>'
+                    ).join('');
+                    logEl.innerHTML = '<div class="fp-permissions-log-title">Sharing Log</div>' + logHtml;
+                }
+            } catch (e) {
+                console.error('loadPermissions error:', e);
+            }
+        }
+
+        // ===== V4: Agent Swarm =====
+        async function loadAgentSwarm(projectId) {
+            try {
+                const status = await apiCall('/projects/' + projectId + '/agent-swarm', 'GET');
+                document.getElementById('pwAgentCount').textContent = status.active_agents || 0;
+                document.getElementById('pwAgentRuns').textContent = status.total_runs || 0;
+                document.getElementById('pwAgentLatency').textContent = status.avg_latency || '\u2014';
+                document.getElementById('pwGuardrailBlocks').textContent = status.guardrail_blocks || 0;
+
+                // Update agent list with real data
+                const agentListEl = document.getElementById('pwAgentList');
+                if (agentListEl && status.agents && status.agents.length > 0) {
+                    agentListEl.innerHTML = status.agents.map(a => {
+                        const statusBadge = a.errors > 0 && a.successes === 0
+                            ? '<span style="font-size:11px;padding:2px 10px;border-radius:10px;background:rgba(239,68,68,0.1);color:var(--danger);font-weight:500;">Error</span>'
+                            : '<span style="font-size:11px;padding:2px 10px;border-radius:10px;background:rgba(34,197,94,0.1);color:var(--success);font-weight:500;">Ready</span>';
+                        const icon = a.name.includes('Fact') ? '\U0001f50d' : a.name.includes('Timeline') ? '\U0001f4c5' : a.name.includes('Statute') ? '\u2696\ufe0f' : a.name.includes('Discrepancy') ? '\u26a1' : '\U0001f4c4';
+                        return '<div style="padding:12px 0;border-bottom:1px solid var(--surface-strong);display:flex;align-items:center;gap:12px;">' +
+                            '<div style="width:36px;height:36px;border-radius:8px;background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;font-size:16px;">' + icon + '</div>' +
+                            '<div style="flex:1;"><div style="font-size:13px;font-weight:500;">' + a.name + '</div>' +
+                            '<div style="font-size:11px;color:var(--text-tertiary);">' + a.runs + ' runs \u2022 ' + a.successes + ' success \u2022 ' + a.errors + ' errors</div></div>' +
+                            statusBadge + '</div>';
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('loadAgentSwarm error:', e);
+            }
+        }
+
+        // ===== V4: Export handlers =====
+        document.getElementById('pwExportPdfBtn')?.addEventListener('click', () => {
+            if (!activeProjectId) return;
+            window.open(API_BASE + '/projects/' + activeProjectId + '/audit-report', '_blank');
+        });
+        document.getElementById('pwExportDocxBtn')?.addEventListener('click', () => {
+            if (!activeProjectId) return;
+            alert('DOCX export coming soon');
+        });
+        document.getElementById('pwShareReportBtn')?.addEventListener('click', () => {
+            if (!activeProjectId) return;
+            alert('Share report coming soon');
+        });
+
+</script>
 </body>
 </html>
