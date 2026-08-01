@@ -727,6 +727,287 @@ async function runRecordsSync(env, searchId, address, apn, county) {
   return { search_id: searchId, agents_run: results, total_records: totalResult.c, ledger_hash: hash.substring(0, 12) };
 }
 
+
+// ===== V4: Audit Report, Permissions, Agent Swarm =====
+
+async function ensureV4Tables(env) {
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS project_permissions (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    user_email TEXT NOT NULL,
+    user_name TEXT,
+    role TEXT NOT NULL DEFAULT 'viewer',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_date TEXT DEFAULT (datetime('now')),
+    updated_date TEXT DEFAULT (datetime('now'))
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS sharing_log (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    user_email TEXT,
+    user_name TEXT,
+    role TEXT,
+    performed_by TEXT,
+    details TEXT,
+    created_date TEXT DEFAULT (datetime('now'))
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS human_decisions (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    decision_text TEXT NOT NULL,
+    decision_type TEXT DEFAULT 'review',
+    performed_by TEXT,
+    created_date TEXT DEFAULT (datetime('now'))
+  )`).run();
+}
+
+async function assembleAuditReport(env, projectId) {
+  const project = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(projectId).first();
+  if (!project) return null;
+
+  const statutes = await env.DB.prepare("SELECT * FROM project_statutes WHERE project_id = ? ORDER BY created_date").bind(projectId).all();
+  const documents = await env.DB.prepare("SELECT id, name, doc_type, source, mime_type, size_bytes, processing_status, uploaded_date FROM project_documents WHERE project_id = ? ORDER BY uploaded_date DESC").bind(projectId).all();
+  const evidence = await env.DB.prepare("SELECT e.*, d.name as source_doc_name FROM project_evidence e LEFT JOIN project_documents d ON e.document_id = d.id WHERE e.project_id = ? ORDER BY e.created_date DESC").bind(projectId).all();
+  const agentRuns = await env.DB.prepare("SELECT * FROM agent_runs WHERE case_id = ? ORDER BY created_date DESC LIMIT 50").bind(projectId).all();
+  const decisions = await env.DB.prepare("SELECT * FROM human_decisions WHERE project_id = ? ORDER BY created_date DESC").bind(projectId).all();
+
+  // Extract timeline events from agent runs
+  let timelineEvents = [];
+  let timelineGaps = [];
+  let discrepancies = [];
+  let statuteResults = [];
+  let guardrailBlocks = [];
+
+  for (const run of agentRuns.results) {
+    let output = run.output;
+    if (typeof output === "string") { try { output = JSON.parse(output); } catch(e) { continue; } }
+    if (output.events) timelineEvents = [...timelineEvents, ...output.events];
+    if (output.gaps) timelineGaps = [...timelineGaps, ...output.gaps];
+    if (output.conflicts) discrepancies = [...discrepancies, ...output.conflicts];
+    if (output.results) statuteResults = [...statuteResults, ...output.results];
+    if (run.guardrail_blocks) {
+      let gb = run.guardrail_blocks;
+      if (typeof gb === "string") { try { gb = JSON.parse(gb); } catch(e) { gb = []; } }
+      guardrailBlocks = [...guardrailBlocks, ...gb];
+    }
+  }
+
+  // Deduplicate timeline events by date+event
+  const seenEvents = new Set();
+  timelineEvents = timelineEvents.filter(e => {
+    const key = (e.date || "") + "|" + (e.event || "");
+    if (seenEvents.has(key)) return false;
+    seenEvents.add(key);
+    return true;
+  }).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  // Build summary
+  const summary = {
+    project_name: project.name,
+    jurisdiction: (project.jurisdiction_county || "") + " County, " + (project.jurisdiction_state || "CA"),
+    description: project.description || "",
+    created_date: project.created_date,
+    total_documents: documents.results.length,
+    total_evidence: evidence.results.length,
+    total_discrepancies: discrepancies.length,
+    total_statutes: statutes.results.length,
+    total_agent_runs: agentRuns.results.length,
+    total_guardrail_blocks: guardrailBlocks.length,
+    status: project.status || "active"
+  };
+
+  // Build findings from discrepancies + statute results
+  const findings = [];
+  for (let i = 0; i < discrepancies.length; i++) {
+    const d = discrepancies[i];
+    findings.push({
+      number: i + 1,
+      type: d.conflict_type || "discrepancy",
+      title: d.characterization || "Conflict identified",
+      detail: `Source A: ${d.source_a?.doc || "unknown"} — ${d.source_a?.text || ""} (${d.source_a?.date || "no date"}). Source B: ${d.source_b?.doc || "unknown"} — ${d.source_b?.text || ""} (${d.source_b?.date || "no date"}).`,
+      status: d.status || "open",
+      tag: "discrepancy"
+    });
+  }
+  for (const r of statuteResults) {
+    if (r.status === "deviation detected") {
+      findings.push({
+        number: findings.length + 1,
+        type: "statute_deviation",
+        title: `${r.statute_ref}: ${r.required_rule || "Deadline check"}`,
+        detail: `Elapsed: ${r.elapsed_days || "unknown"} days. Status: ${r.status}. ${r.note || ""}`,
+        status: "open",
+        tag: "deviation"
+      });
+    }
+  }
+  for (const r of statuteResults) {
+    if (r.status === "matches expected window") {
+      findings.push({
+        number: findings.length + 1,
+        type: "statute_match",
+        title: `${r.statute_ref}: ${r.required_rule || "Deadline check"}`,
+        detail: `Elapsed: ${r.elapsed_days || "unknown"} days. Status: ${r.status}. ${r.note || ""}`,
+        status: "resolved",
+        tag: "compliant"
+      });
+    }
+  }
+
+  // Build applicable rules
+  const applicableRules = statutes.results.map(s => ({
+    ref: s.ref,
+    description: s.description,
+    deadline_type: s.deadline_type,
+    deadline_value: s.deadline_value,
+    deadline_direction: s.deadline_direction,
+    category: s.category,
+    source: s.source
+  }));
+
+  // Build AI analysis from agent runs
+  const aiAnalysis = agentRuns.results.map(r => {
+    let output = r.output;
+    if (typeof output === "string") { try { output = JSON.parse(output); } catch(e) { output = { raw: output }; } }
+    return {
+      agent: r.agent_name,
+      status: r.status,
+      timestamp: r.created_date,
+      hash: r.hash ? r.hash.substring(0, 12) : null,
+      output: output
+    };
+  });
+
+  return {
+    summary,
+    findings,
+    evidence: evidence.results,
+    timeline: { events: timelineEvents, gaps: timelineGaps },
+    applicable_rules: applicableRules,
+    ai_analysis: aiAnalysis,
+    human_decisions: decisions.results,
+    appendices: documents.results,
+    guardrail: GUARDRAIL,
+    guardrail_blocks: guardrailBlocks,
+    generated_at: new Date().toISOString()
+  };
+}
+
+async function getProjectPermissions(env, projectId) {
+  await ensureV4Tables(env);
+  const perms = await env.DB.prepare("SELECT * FROM project_permissions WHERE project_id = ? AND status = 'active' ORDER BY created_date").bind(projectId).all();
+  const project = await env.DB.prepare("SELECT * FROM projects WHERE id = ?").bind(projectId).first();
+
+  const roleCounts = { owner: 0, editor: 0, viewer: 0, outside_counsel: 0 };
+  for (const p of perms.results) {
+    if (roleCounts[p.role] !== undefined) roleCounts[p.role]++;
+  }
+
+  return {
+    project_id: projectId,
+    project_name: project?.name || "Unknown",
+    roles: {
+      owner: { count: roleCounts.owner, members: perms.results.filter(p => p.role === "owner") },
+      editors: { count: roleCounts.editor, members: perms.results.filter(p => p.role === "editor") },
+      viewers: { count: roleCounts.viewer, members: perms.results.filter(p => p.role === "viewer") },
+      outside_counsel: { count: roleCounts.outside_counsel, members: perms.results.filter(p => p.role === "outside_counsel") },
+      public_link: { enabled: false, url: null }
+    }
+  };
+}
+
+async function updateProjectPermissions(env, projectId, body, performedBy) {
+  await ensureV4Tables(env);
+  const { action, user_email, user_name, role } = body;
+
+  if (action === "invite") {
+    const id = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO project_permissions (id, project_id, user_email, user_name, role, status) VALUES (?, ?, ?, ?, ?, 'active')").bind(id, projectId, user_email, user_name || user_email, role || "viewer").run();
+    await env.DB.prepare("INSERT INTO sharing_log (id, project_id, action, user_email, user_name, role, performed_by, details) VALUES (?, ?, 'invite', ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), projectId, user_email, user_name || user_email, role || "viewer", performedBy || "system", `Invited ${user_email} as ${role || "viewer"}`).run();
+    return { id, message: "User invited" };
+  }
+
+  if (action === "revoke") {
+    await env.DB.prepare("UPDATE project_permissions SET status = 'revoked', updated_date = datetime('now') WHERE project_id = ? AND user_email = ?").bind(projectId, user_email).run();
+    await env.DB.prepare("INSERT INTO sharing_log (id, project_id, action, user_email, role, performed_by, details) VALUES (?, ?, 'revoke', ?, ?, ?, ?)").bind(crypto.randomUUID(), projectId, user_email, role || "viewer", performedBy || "system", `Revoked access for ${user_email}`).run();
+    return { message: "Access revoked" };
+  }
+
+  if (action === "change_role") {
+    await env.DB.prepare("UPDATE project_permissions SET role = ?, updated_date = datetime('now') WHERE project_id = ? AND user_email = ? AND status = 'active'").bind(role, projectId, user_email).run();
+    await env.DB.prepare("INSERT INTO sharing_log (id, project_id, action, user_email, role, performed_by, details) VALUES (?, ?, 'role_change', ?, ?, ?, ?)").bind(crypto.randomUUID(), projectId, user_email, role, performedBy || "system", `Changed ${user_email} to ${role}`).run();
+    return { message: "Role updated" };
+  }
+
+  return { error: "Unknown action" };
+}
+
+async function getSharingLog(env, projectId) {
+  await ensureV4Tables(env);
+  const log = await env.DB.prepare("SELECT * FROM sharing_log WHERE project_id = ? ORDER BY created_date DESC").bind(projectId).all();
+  return log.results;
+}
+
+async function getAgentSwarmStatus(env, projectId) {
+  const runs = await env.DB.prepare("SELECT * FROM agent_runs WHERE case_id = ? ORDER BY created_date DESC").bind(projectId).all();
+
+  const agentMap = {};
+  let totalRuns = runs.results.length;
+  let totalLatency = 0;
+  let latencyCount = 0;
+  let guardrailBlocks = 0;
+
+  for (const run of runs.results) {
+    if (!agentMap[run.agent_name]) {
+      agentMap[run.agent_name] = { name: run.agent_name, runs: 0, successes: 0, errors: 0, last_run: null };
+    }
+    agentMap[run.agent_name].runs++;
+    if (run.status === "success") agentMap[run.agent_name].successes++;
+    if (run.status === "error") agentMap[run.agent_name].errors++;
+    agentMap[run.agent_name].last_run = run.created_date;
+
+    // Try to compute latency
+    if (run.started_at && run.completed_at) {
+      const start = new Date(run.started_at).getTime();
+      const end = new Date(run.completed_at).getTime();
+      if (end > start) {
+        totalLatency += (end - start);
+        latencyCount++;
+      }
+    }
+
+    // Count guardrail blocks
+    let gb = run.guardrail_blocks;
+    if (typeof gb === "string") { try { gb = JSON.parse(gb); } catch(e) { gb = []; } }
+    if (Array.isArray(gb)) guardrailBlocks += gb.length;
+  }
+
+  const agents = Object.values(agentMap);
+  const avgLatency = latencyCount > 0 ? Math.round(totalLatency / latencyCount) + "ms" : "—";
+
+  return {
+    project_id: projectId,
+    active_agents: agents.length,
+    agents: agents,
+    total_runs: totalRuns,
+    avg_latency: avgLatency,
+    guardrail_blocks: guardrailBlocks,
+    guardrail: GUARDRAIL
+  };
+}
+
+async function addHumanDecision(env, projectId, body) {
+  await ensureV4Tables(env);
+  const { decision_text, decision_type, performed_by } = body;
+  const id = crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO human_decisions (id, project_id, decision_text, decision_type, performed_by) VALUES (?, ?, ?, ?, ?)").bind(id, projectId, decision_text, decision_type || "review", performed_by || "unknown").run();
+  // Also log to sharing_log for audit trail
+  await env.DB.prepare("INSERT INTO sharing_log (id, project_id, action, performed_by, details) VALUES (?, ?, 'human_decision', ?, ?)").bind(crypto.randomUUID(), projectId, performed_by || "unknown", decision_text).run();
+  return { id, message: "Decision recorded" };
+}
+
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -737,7 +1018,7 @@ export default {
 
     if (path === "/" || path === "/health") {
       return corsResponse(JSON.stringify({
-        service: "FairProcess V3 Gateway",
+        service: "FairProcess V4 Gateway",
         status: "operational",
         model: CF_MODEL,
         guardrail: GUARDRAIL,
@@ -1238,6 +1519,72 @@ export default {
       }
     }
 
+
+      // ===== V4 Routes =====
+
+      // GET /projects/:id/audit-report — assemble full audit report
+      if (subPath === "/audit-report" && request.method === "GET") {
+        try {
+          const report = await assembleAuditReport(env, projectId);
+          if (!report) return corsResponse(JSON.stringify({ error: "Project not found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+          return corsResponse(JSON.stringify(report, null, 2), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // POST /projects/:id/audit-report/decision — record human decision
+      if (subPath === "/audit-report/decision" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const result = await addHumanDecision(env, projectId, body);
+          return corsResponse(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // GET /projects/:id/permissions — get permission config
+      if (subPath === "/permissions" && request.method === "GET") {
+        try {
+          const perms = await getProjectPermissions(env, projectId);
+          return corsResponse(JSON.stringify(perms, null, 2), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // PUT /projects/:id/permissions — invite/revoke/change role
+      if (subPath === "/permissions" && request.method === "PUT") {
+        try {
+          const body = await request.json();
+          const result = await updateProjectPermissions(env, projectId, body, body.performed_by);
+          return corsResponse(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // GET /projects/:id/sharing-log — get sharing audit trail
+      if (subPath === "/sharing-log" && request.method === "GET") {
+        try {
+          const log = await getSharingLog(env, projectId);
+          return corsResponse(JSON.stringify(log, null, 2), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
+      // GET /projects/:id/agent-swarm — agent status + metrics
+      if (subPath === "/agent-swarm" && request.method === "GET") {
+        try {
+          const status = await getAgentSwarmStatus(env, projectId);
+          return corsResponse(JSON.stringify(status, null, 2), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return corsResponse(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+
     // ===== Records Sync Routes =====
     // GET /records/agents — list available records agents
     if (path === "/records/agents" && request.method === "GET") {
@@ -1433,7 +1780,7 @@ export default {
 
     return corsResponse(JSON.stringify({
       error: "Not found",
-      endpoints: ["/", "/projects", "/records/agents", "/records/sync", "/records/sync/:id", "/records/searches", "/records/:id", "/gateway", "/ledger?case_id=X", "/case?case_id=X", "/seed"]
+      endpoints: ["/", "/projects", "/projects/:id", "/projects/:id/audit-report", "/projects/:id/permissions", "/projects/:id/sharing-log", "/projects/:id/agent-swarm", "/records/agents", "/records/sync", "/records/sync/:id", "/records/searches", "/records/:id", "/gateway", "/ledger?case_id=X", "/case?case_id=X", "/seed"]
     }), { status: 404, headers: { "Content-Type": "application/json" } });
   }
 };
