@@ -62,7 +62,7 @@
         .fp-app { display: flex; height: 100vh; }
         .fp-sidebar { width: 240px; background: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; z-index: 10; transition: width var(--transition); }
         .fp-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
-        .fp-content { flex: 1; padding: 24px; overflow-y: auto; background: var(--surface-strong); }
+        .fp-content { flex: 1; padding: 24px; overflow-y: auto; background: var(--surface-strong); scroll-behavior: smooth; }
         .fp-content.agent-mode-active { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 
         /* ================================================================
@@ -200,8 +200,9 @@
         /* ================================================================
            V3: Agent Frame (enhanced from V2)
            ================================================================ */
-        .fp-agent-frame { position: fixed; right: 0; top: 60px; bottom: 0; width: 420px; background: var(--surface); border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); transform: translateX(100%); transition: transform 0.3s ease; z-index: 100; display: flex; flex-direction: column; }
+        .fp-agent-frame { position: fixed; right: 0; top: 60px; bottom: 0; width: 420px; max-width: 100vw; background: var(--surface); border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); transform: translateX(100%); transition: transform 0.3s ease; z-index: 100; display: flex; flex-direction: column; }
         .fp-agent-frame.active { transform: translateX(0); }
+        @media (max-width: 768px) { .fp-agent-frame { width: 100vw; } }
         .fp-agent-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
         .fp-agent-header-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
         .fp-agent-status { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
@@ -375,15 +376,31 @@
            Tables
            ================================================================ */
         .fp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .fp-table th { text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-tertiary); font-weight: 600; border-bottom: 1px solid var(--border); }
-        .fp-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        .fp-table th { text-align: left; padding: 12px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-tertiary); font-weight: 600; border-bottom: 2px solid var(--border); background: var(--surface-muted); position: sticky; top: 0; z-index: 1; }
+        .fp-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        .fp-table tbody tr { transition: background var(--transition); }
         .fp-table tr:hover td { background: var(--surface-muted); }
         .fp-table .mono { font-family: monospace; font-size: 12px; }
 
         /* ================================================================
            Chat (Assistant page)
            ================================================================ */
-        .fp-chat-area { max-height: 500px; overflow-y: auto; padding: 8px 0; }
+        .fp-chat-area { max-height: 500px; overflow-y: auto; padding: 8px 0; scroll-behavior: smooth; }
+        .fp-chat-bubble.ai { line-height: 1.6; }
+        .fp-chat-bubble.user { line-height: 1.5; }
+        .fp-chat-timestamp { font-size: 10px; color: var(--text-quaternary); margin-top: 4px; }
+        .fp-chat-typing { display: inline-flex; gap: 4px; align-items: center; }
+        .fp-chat-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--text-quaternary); animation: fpTypingBounce 1.4s infinite; }
+        .fp-chat-typing span:nth-child(2) { animation-delay: 0.2s; }
+        .fp-chat-typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes fpTypingBounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
+        .fp-chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .fp-chat-suggestion { padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all var(--transition); font-family: inherit; }
+        .fp-chat-suggestion:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+        .fp-chat-welcome { text-align: center; padding: 40px 20px; }
+        .fp-chat-welcome-icon { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: white; font-size: 28px; font-weight: 700; box-shadow: 0 4px 20px var(--accent-glow); }
+        .fp-chat-welcome-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+        .fp-chat-welcome-desc { font-size: 13px; color: var(--text-tertiary); max-width: 400px; margin: 0 auto 20px; line-height: 1.5; }
         .fp-chat-msg { display: flex; gap: 12px; margin-bottom: 16px; }
         .fp-chat-msg.user { justify-content: flex-end; }
         .fp-chat-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
@@ -394,7 +411,8 @@
         .fp-chat-bubble .agents-tag { font-size: 11px; color: var(--accent); margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
         .fp-chat-input { display: flex; gap: 8px; margin-top: 16px; }
         .fp-chat-input input { flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; font-family: inherit; outline: none; }
-        .fp-chat-input input:focus { border-color: var(--accent); }
+        .fp-chat-input input:focus, .fp-chat-input textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .fp-chat-input { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--surface); border-radius: 0 0 var(--radius) var(--radius); }
 
         /* ================================================================
            Policy Studio (ported from V1)
@@ -611,9 +629,10 @@
         .fp-statute-deadline { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
 
         /* Modal */
-        .fp-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; display: none; align-items: center; justify-content: center; padding: 20px; }
-        .fp-modal-overlay.active { display: flex; }
-        .fp-modal { background: var(--surface); border-radius: var(--radius); padding: 28px; max-width: 480px; width: 100%; box-shadow: var(--shadow-lg); }
+        .fp-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; display: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px; }
+        .fp-modal-overlay.active { display: flex; animation: fpFadeIn 0.2s ease-out; }
+        .fp-modal { background: var(--surface); border-radius: var(--radius); padding: 28px; max-width: 480px; width: 100%; box-shadow: var(--shadow-lg); animation: fpModalIn 0.25s ease-out; max-height: 90vh; overflow-y: auto; }
+        @keyframes fpModalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .fp-modal-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
         .fp-modal-sub { font-size: 13px; color: var(--text-tertiary); margin-bottom: 20px; }
         .fp-modal-field { margin-bottom: 16px; }
@@ -688,6 +707,46 @@
         .fp-records-history-item .meta { font-size: 11px; color: var(--text-tertiary); display: flex; gap: 12px; }
 
         
+        
+        /* ================================================================
+           V4 Optimized: Dark Mode
+           ================================================================ 
+        [data-theme="dark"] {
+            --sidebar-bg: #0a0f1a;
+            --border: #1e293b;
+            --surface: #131826;
+            --surface-muted: #1a2032;
+            --surface-strong: #0f1521;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-tertiary: #64748b;
+            --text-quaternary: #475569;
+            --accent-light: rgba(99, 102, 241, 0.15);
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+        [data-theme="dark"] .fp-header { background: var(--surface); }
+        [data-theme="dark"] .fp-ctx-bar { background: var(--surface); }
+        [data-theme="dark"] .fp-chat-bubble.ai { background: var(--surface-muted); }
+        [data-theme="dark"] .fp-chat-bubble.user { background: var(--accent); }
+        [data-theme="dark"] .fp-table tr:hover td { background: var(--surface-muted); }
+        [data-theme="dark"] .fp-sat-no-map { background: linear-gradient(135deg, #0a0f1a, #16213e); }
+
+        .fp-theme-toggle { width: 36px; height: 36px; border-radius: 8px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); transition: all var(--transition); }
+        .fp-theme-toggle:hover { background: var(--surface-muted); }
+        .fp-theme-toggle svg { width: 18px; height: 18px; }
+        .fp-theme-toggle .sun { display: none; }
+        .fp-theme-toggle .moon { display: block; }
+        [data-theme="dark"] .fp-theme-toggle .sun { display: block; }
+        [data-theme="dark"] .fp-theme-toggle .moon { display: none; }
+
+        
+        /* V4 Optimized: Stat card improvements */
+        .fp-stat { transition: transform var(--transition), box-shadow var(--transition); }
+        .fp-stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .fp-stat-value { font-variant-numeric: tabular-nums; }
+
         /* ================================================================
            V4 Optimized: Toast Notifications
            ================================================================ 
@@ -980,8 +1039,8 @@
         .fp-pw-page.active { display: block; }
 
         /* V4: Share modal */
-        .fp-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .fp-modal-overlay.active { display: flex; }
+        .fp-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        .fp-modal-overlay.active { display: flex; animation: fpFadeIn 0.2s ease-out; }
 
         </style>
 
@@ -1109,6 +1168,10 @@
                     <button class="fp-agent-toggle fp-tooltip" data-tooltip="Ctrl+Shift+A" id="agentToggle">
                         <span class="dot"></span>
                         Agent Mode
+                    </button>
+                    <button class="fp-theme-toggle" id="themeToggle" title="Toggle theme">
+                        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                     </button>
                     <button class="fp-header-btn fp-tooltip" data-tooltip="Notifications">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -1828,16 +1891,24 @@
                     <p class="fp-page-subtitle">Ask anything about your jurisdiction. The orchestrator routes to the right experts automatically.</p>
                     <div class="fp-panel">
                         <div class="fp-chat-area" id="chatArea">
-                            <div class="fp-chat-msg">
-                                <div class="fp-chat-avatar ai">FP</div>
-                                <div class="fp-chat-bubble ai">
-                                    I'm your FairProcess assistant. I can analyze evidence, check deadlines against statutes, flag discrepancies, and coordinate across specialist agents. What do you need?
+                            <div class="fp-chat-welcome" id="chatWelcome">
+                                <div class="fp-chat-welcome-icon">FP</div>
+                                <div class="fp-chat-welcome-title">FairProcess Assistant</div>
+                                <div class="fp-chat-welcome-desc">I can analyze evidence, check deadlines against statutes, flag discrepancies, and coordinate across specialist agents. What do you need?</div>
+                                <div class="fp-chat-suggestions">
+                                    <button class="fp-chat-suggestion" onclick="sendChatMessage('Check statute compliance for case CE26-0402')">⚖️ Check statute compliance</button>
+                                    <button class="fp-chat-suggestion" onclick="sendChatMessage('Flag any discrepancies in the evidence')">🔍 Flag discrepancies</button>
+                                    <button class="fp-chat-suggestion" onclick="sendChatMessage('Build a timeline from verified facts')">📅 Build timeline</button>
+                                    <button class="fp-chat-suggestion" onclick="sendChatMessage('Summarize the case context')">📋 Summarize case</button>
                                 </div>
                             </div>
                         </div>
                         <div class="fp-chat-input">
-                            <input type="text" id="chatInput" placeholder="Ask about a case, statute, deadline, or evidence..." />
-                            <button class="fp-btn primary" onclick="sendChatMessage()">Send</button>
+                            <textarea id="chatInput" placeholder="Ask about a case, statute, deadline, or evidence..." rows="1" style="flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--border);font-size:13px;font-family:inherit;outline:none;resize:none;max-height:120px;line-height:1.5;"></textarea>
+                            <button class="fp-btn primary" onclick="sendChatMessage()" style="display:flex;align-items:center;gap:6px;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                Send
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -3356,6 +3427,10 @@
             document.getElementById('chatInput').value = '';
             state.isProcessing = true;
 
+            // V4: Hide welcome screen on first message
+            const welcome = document.getElementById('chatWelcome');
+            if (welcome) welcome.style.display = 'none';
+
             // Navigate to assistant page
             $$('.fp-nav-item').forEach(n => n.classList.remove('active'));
             document.querySelector('.fp-nav-item[data-page="assistant"]')?.classList.add('active');
@@ -3374,7 +3449,7 @@
             const loadingMsg = document.createElement('div');
             loadingMsg.className = 'fp-chat-msg';
             loadingMsg.id = 'loading-msg';
-            loadingMsg.innerHTML = `<div class="fp-chat-avatar ai">FP</div><div class="fp-chat-bubble ai" style="opacity:0.6;">⏳ Analyzing... routing to agents...</div>`;
+            loadingMsg.innerHTML = `<div class="fp-chat-avatar ai">FP</div><div class="fp-chat-bubble ai"><div class="fp-chat-typing"><span></span><span></span><span></span></div></div>`;
             chatArea.appendChild(loadingMsg);
             chatArea.scrollTop = chatArea.scrollHeight;
 
@@ -3444,8 +3519,13 @@
             }
         }
 
-        document.getElementById('chatInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') sendChatMessage();
+        var chatInputEl = document.getElementById('chatInput');
+        chatInputEl.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+        chatInputEl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); this.style.height = 'auto'; }
         });
 
         // ===== Global Search =====
@@ -3803,7 +3883,7 @@
                 badge.textContent = projects.length;
 
                 if (projects.length === 0) {
-                    grid.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text-tertiary);grid-column:1/-1;"><div style="font-size:32px;margin-bottom:8px;">📁</div><p style="font-size:14px;">No projects yet. Click "New Project" to create your first case workspace.</p></div>';
+                    grid.innerHTML = '<div class="fp-empty-state" style="grid-column:1/-1;"><div class="fp-empty-state-icon">📁</div><div class="fp-empty-state-title">No Projects Yet</div><div class="fp-empty-state-desc">Create your first project workspace to start managing jurisdiction compliance cases, evidence, and audit reports.</div><button class="fp-empty-state-action" onclick="document.getElementById(\'newProjectBtn\').click()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Create Your First Project</button></div>';
                     return;
                 }
 
@@ -4552,6 +4632,15 @@
         window.addEventListener('error', (e) => console.error('Global JS error:', e.message, e.filename, e.lineno));
         // V4: Hide context bar initially (projects page is default)
             document.querySelector('.fp-ctx-bar')?.classList.add('hidden');
+            // Theme toggle init
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const savedTheme = localStorage.getItem('fp-theme') || 'light';
+            if (savedTheme === 'dark') document.body.setAttribute('data-theme', 'dark');
+            if (themeToggleBtn) themeToggleBtn.addEventListener('click', () => {
+                const current = document.body.getAttribute('data-theme');
+                if (current === 'dark') { document.body.removeAttribute('data-theme'); localStorage.setItem('fp-theme', 'light'); }
+                else { document.body.setAttribute('data-theme', 'dark'); localStorage.setItem('fp-theme', 'dark'); }
+            });
             try { loadCaseContext(); } catch(e) { console.error('Init loadCaseContext:', e); }
         try { loadProjects(); } catch(e) { console.error('Init loadProjects:', e); }
         try { loadRecordsAgents(); } catch(e) { console.error('Init loadRecordsAgents:', e); }
